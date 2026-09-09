@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Платформа «Отклик» — Подача обращения</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+        body { background-color: #f8f9fa; color: #1e293b; min-height: 100vh; display: flex; flex-direction: column; }
+        header { background: #ffffff; border-bottom: 1px solid #e2e8f0; position: sticky; top: 0; z-index: 40; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 0 20px; }
+        .header-content { height: 70px; display: flex; align-items: center; justify-content: space-between; }
+        .logo-box { display: flex; align-items: center; gap: 12px; }
+        .logo-icon { width: 40px; height: 40px; background: #0284c7; color: white; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 18px; }
+        .logo-text { font-size: 20px; font-weight: 800; color: #0f172a; }
+        .btn { background: #0284c7; color: white; border: none; padding: 10px 20px; border-radius: 12px; font-weight: 600; font-size: 14px; cursor: pointer; transition: background 0.2s; text-decoration: none; display: inline-block; }
+        .btn:hover { background: #0369a1; }
+        .btn-dark { background: #0f172a; }
+        .btn-dark:hover { background: #1e293b; }
+        
+        main { flex: 1; padding: 60px 20px; max-width: 1000px; margin: 0 auto; width: 100%; display: flex; flex-direction: column; gap: 60px; }
+        .hero { text-align: center; display: flex; flex-direction: column; align-items: center; gap: 20px; }
+        .badge { background: #e0f2fe; color: #0369a1; font-size: 12px; font-weight: 700; padding: 6px 14px; border-radius: 20px; text-transform: uppercase; letter-spacing: 0.5px; }
+        h1 { font-size: 48px; font-weight: 900; color: #0f172a; line-height: 1.1; }
+        .hero p { font-size: 18px; color: #64748b; max-width: 650px; }
+        
+        .features { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px; }
+        .card { background: white; border: 1px solid #e2e8f0; border-radius: 20px; padding: 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
+        .card-icon { width: 44px; height: 44px; background: #e0f2fe; color: #0284c7; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 20px; margin-bottom: 16px; }
+        .card h3 { font-size: 18px; font-weight: 700; color: #0f172a; margin-bottom: 8px; }
+        .card p { font-size: 14px; color: #64748b; line-height: 1.5; }
+
+        .status-box { background: white; border: 1px solid #e2e8f0; border-radius: 20px; padding: 32px; box-shadow: 0 1px 3px rgba(0,0,0,0.02); display: flex; flex-direction: column; gap: 16px; max-width: 600px; margin: 0 auto; width: 100%; }
+        .status-box h2 { font-size: 22px; font-weight: 800; color: #0f172a; }
+        .status-box p { font-size: 14px; color: #64748b; }
+        .input-group { display: flex; gap: 12px; }
+        input, select, textarea { flex: 1; background: #f8f9fa; border: 1px solid #cbd5e1; border-radius: 12px; padding: 12px 16px; font-size: 14px; outline: none; transition: border-color 0.2s; }
+        input:focus, select:focus, textarea:focus { border-color: #0284c7; background: #fff; }
+
+        .modal-backdrop { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px); display: none; align-items: center; justify-content: center; z-index: 100; padding: 20px; }
+        .modal { background: white; border-radius: 24px; width: 100%; max-width: 540px; padding: 32px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); display: flex; flex-direction: column; gap: 20px; position: relative; max-height: 90vh; overflow-y: auto; }
+        .close-btn { position: absolute; top: 20px; right: 20px; background: none; border: none; font-size: 24px; color: #94a3b8; cursor: pointer; }
+        .close-btn:hover { color: #0f172a; }
+        .form-field { display: flex; flex-direction: column; gap: 6px; }
+        .form-field label { font-size: 12px; font-weight: 700; color: #64748b; text-transform: uppercase; }
+        .alert-box { background: #fef3c7; border: 1px solid #fde68a; border-radius: 12px; padding: 12px 16px; font-size: 13px; color: #92400e; line-height: 1.4; }
+        
+        .success-content { text-align: center; display: flex; flex-direction: column; align-items: center; gap: 20px; }
+        .success-icon { width: 64px; height: 64px; background: #d1fae5; color: #059669; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 32px; font-weight: bold; }
+        .tracking-code-block { background: #f8f9fa; border: 1px solid #e2e8f0; border-radius: 16px; padding: 16px; width: 100%; display: flex; flex-direction: column; gap: 4px; }
+        .tracking-code { font-family: monospace; font-size: 24px; font-weight: 800; color: #0284c7; }
+        
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="container header-content">
+            <div class="logo-box">
+                <div class="logo-icon">💬</div>
+                <div class="logo-text">Отклик</div>
+            </div>
+            <div style="display: flex; gap: 16px; align-items: center;">
+                <a href="index.html" style="font-size: 14px; font-weight: 600; color: #64748b; text-decoration: none;">На главную</a>
+                <button class="btn" onclick="openModal()">Подать обращение</button>
+            </div>
+        </div>
+    </header>
+
+    <main>
+        <div class="hero">
+            <span class="badge">Анонимная платформа для обращений</span>
+            <h1>Ваш голос важен</h1>
+            <p>Сообщите о проблеме, нарушении или сложной ситуации. Мы обеспечиваем полную анонимность и безопасность ваших обращений.</p>
+            <button class="btn" style="padding: 16px 32px; font-size: 16px; margin-top: 10px;" onclick="openModal()">Сообщить о проблеме / Подать обращение &rarr;</button>
+        </div>
+
+        <div class="features">
+            <div class="card">
+                <div class="card-icon">🔒</div>
+                <h3>Полная анонимность</h3>
+                <p>Ваши данные не раскрываются. Мы не запрашиваем личную информацию.</p>
+            </div>
+            <div class="card">
+                <div class="card-icon">🛡️</div>
+                <h3>Безопасность</h3>
+                <p>Все обращения защищены современными технологиями шифрования.</p>
+            </div>
+            <div class="card">
+                <div class="card-icon">❤️</div>
+                <h3>Забота о людях</h3>
+                <p>Мы стремимся, чтобы каждый получил поддержку и справедливое решение.</p>
+            </div>
+        </div>
+
+        <div class="status-box">
+            <h2>Проверка статуса обращения</h2>
+            <p>Введите трек-номер, который вы получили после отправки обращения.</p>
+            <div class="input-group">
+                <input type="text" id="checkCodeInput" placeholder="Например: otk-4827-6391">
+                <button class="btn btn-dark" onclick="checkStatus()">Проверить</button>
+            </div>
+            <div id="checkResult" class="hidden"></div>
+        </div>
+    </main>
+
+    <!-- Модалка подачи -->
+    <div id="reportModal" class="modal-backdrop">
+        <div class="modal">
+            <button class="close-btn" onclick="closeModal()">&times;</button>
+            <h2 style="font-size: 22px; font-weight: 800; color: #0f172a;">Подача обращения</h2>
+
+            <div class="form-field">
+                <label>Кто вы?</label>
+                <select id="applicantType">
+                    <option value="student">Студент / Ученик</option>
+                    <option value="teacher">Преподаватель / Сотрудник</option>
+                    <option value="parent">Родитель</option>
+                </select>
+            </div>
+
+            <div class="form-field">
+                <label>Категория проблемы</label>
+                <select id="categorySelect">
+                    <option value="1">Психологическое давление / буллинг</option>
+                    <option value="2">Учебные или организационные вопросы</option>
+                    <option value="3">Технические проблемы / безопасность</option>
+                </select>
+            </div>
+
+            <div class="form-field">
+                <label>Описание ситуации</label>
+                <textarea id="reportContent" rows="4" placeholder="Подробно опишите, что произошло..."></textarea>
+            </div>
+
+            <div class="alert-box">
+                ⚠️ Если в тексте обнаружатся ключевые слова риска (суицидальные мысли, угрозы жизни и др.), система автоматически предложит экстренную помощь.
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 10px;">
+                <button class="btn" style="background: #e2e8f0; color: #475569;" onclick="closeModal()">Отмена</button>
+                <button class="btn" onclick="submitReport()">Отправить</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модалка успеха -->
+    <div id="successModal" class="modal-backdrop">
+        <div class="modal success-content">
+            <div class="success-icon">✓</div>
+            <div>
+                <h3 style="font-size: 22px; font-weight: 800; color: #0f172a; margin-bottom: 6px;">Обращение успешно отправлено!</h3>
+                <p style="font-size: 14px; color: #64748b;">Спасибо, что поделились. Ваше обращение принято и будет рассмотрено в ближайшее время.</p>
+            </div>
+            <div class="tracking-code-block">
+                <span style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase;">Ваш трек-номер</span>
+                <div id="generatedTrackingCode" class="tracking-code">otk-0000-0000</div>
+            </div>
+            <button class="btn" style="width: 100%; padding: 14px;" onclick="closeSuccessModal()">Вернуться на главную</button>
+        </div>
+    </div>
+
+    <script>
+        function openModal() { document.getElementById('reportModal').style.display = 'flex'; }
+        function closeModal() { document.getElementById('reportModal').style.display = 'none'; }
+        function closeSuccessModal() { document.getElementById('successModal').style.display = 'none'; location.reload(); }
+
+        async function submitReport() {
+            const applicant_type = document.getElementById('applicantType').value;
+            const category_id = parseInt(document.getElementById('categorySelect').value);
+            const content = document.getElementById('reportContent').value;
+
+            if (!content.trim()) { alert('Пожалуйста, опишите ситуацию'); return; }
+
+            try {
+                const response = await fetch('http://localhost:8000/api/reports', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ applicant_type, category_id, content, attachments: [] })
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    document.getElementById('generatedTrackingCode').innerText = data.tracking_code;
+                    closeModal();
+                    document.getElementById('successModal').style.display = 'flex';
+                } else {
+                    alert('Ошибка при отправке обращения');
+                }
+            } catch (error) {
+                console.error(error);
+                alert('Не удалось подключиться к серверу бэкенда (убедитесь, что Docker запущен)');
+            }
+        }
+
+        async function checkStatus() {
+            const tracking_code = document.getElementById('checkCodeInput').value.trim();
+            const resultDiv = document.getElementById('checkResult');
+
+            if (!tracking_code) { alert('Введите трек-номер'); return; }
+
+            try {
+                const response = await fetch('http://localhost:8000/api/reports/check-status', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ tracking_code })
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    resultDiv.classList.remove('hidden');
+                    resultDiv.innerHTML = `
+                        <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 8px; margin-top: 12px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <strong style="color: #166534;">Статус: ${data.status}</strong>
+                                <span style="font-size: 12px; color: #64748b;">${data.created_at}</span>
+                            </div>
+                            <div style="font-size: 14px; color: #1e293b;">Приоритет: <strong style="text-transform: uppercase;">${data.priority}</strong></div>
+                        </div>
+                    `;
+                } else {
+                    resultDiv.classList.remove('hidden');
+                    resultDiv.innerHTML = `<div style="background: #fef2f2; color: #991b1b; padding: 12px; border-radius: 12px; font-size: 14px; margin-top: 12px;">Обращение не найдено. Проверьте правильность трек-номера.</div>`;
+                }
+            } catch (error) {
+                console.error(error);
+                alert('Ошибка соединения с сервером');
+            }
+        }
+    </script>
+</body>
+</html>
