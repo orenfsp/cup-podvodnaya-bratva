@@ -68,8 +68,8 @@
                 <div class="logo-text">Кабинет эксперта</div>
             </div>
             <div style="display: flex; align-items: center; gap: 16px;">
-                <span style="font-weight: 600; font-size: 14px; color: #475569;">Эксперт: <input type="text" id="currentExpertInput" value="Анна Смирнова" style="width: 150px; display: inline-block; padding: 6px; font-size: 13px;" onchange="initExpertCabinet()"></span>
-                <a href="index.html" class="btn btn-secondary">На главную</a>
+                <span style="font-weight: 600; font-size: 14px; color: #475569;">Эксперт: <span id="currentExpertName" style="color: #0284c7;">Загрузка...</span></span>
+                <button onclick="logout()" class="btn btn-secondary">Выйти</button>
             </div>
         </div>
     </header>
@@ -116,9 +116,9 @@
                             <select id="expertStatusSelect" onchange="updateReportStatus()">
                                 <option value="new">Новое</option>
                                 <option value="in_progress">В работе</option>
-                                <option value="needs_info">Нужно уточнение</option>
                                 <option value="ready">Ответ готов</option>
                                 <option value="completed">Завершено</option>
+                                <option value="rejected">Отклонено</option>
                             </select>
                         </div>
 
@@ -139,44 +139,59 @@
     </main>
 
     <script>
+        const API_URL = "http://localhost:8000";
+        let currentUser = null;
         let allReports = [];
         let currentSelectedReport = null;
 
-        function initExpertCabinet() {
-            let reports = JSON.parse(localStorage.getItem('otklik_reports') || '[]');
-            
-            if (reports.length === 0) {
-                reports = [
-                    {
-                        tracking_code: 'ОТК-4829-1920',
-                        applicant_type: 'Школьник',
-                        category: 'Конфликт с одноклассниками',
-                        content: 'Меня постоянно дразнят в классе и портят вещи.',
-                        priority: 'urgent',
-                        status: 'in_progress',
-                        expert_id: 'Анна Смирнова',
-                        notes: '',
-                        messages: [
-                            { sender_type: 'applicant', message: 'Меня постоянно дразнят в классе и портят вещи.' }
-                        ]
-                    }
-                ];
-                localStorage.setItem('otklik_reports', JSON.stringify(reports));
+        async function initExpertCabinet() {
+            // Получаем залогиненного пользователя из localStorage
+            const userStr = localStorage.getItem('user');
+            if (!userStr) {
+                alert('Необходима авторизация');
+                window.location.href = 'index.html';
+                return;
             }
 
-            allReports = reports;
-            renderReportsList();
+            currentUser = JSON.parse(userStr);
+            if (currentUser.role !== 'expert' && currentUser.role !== 'admin') {
+                alert('Доступ запрещен');
+                window.location.href = 'index.html';
+                return;
+            }
 
-            if (currentSelectedReport) {
-                const updated = allReports.find(r => r.tracking_code === currentSelectedReport.tracking_code);
-                if (updated) selectReport(updated);
+            document.getElementById('currentExpertName').innerText = currentUser.full_name || currentUser.username;
+
+            try {
+                // Загружаем обращения, назначенные на этого эксперта
+                const response = await fetch(`${API_URL}/api/reports?expert_id=${currentUser.id}`);
+                if (response.ok) {
+                    allReports = await response.json();
+                    renderReportsList();
+
+                    if (currentSelectedReport) {
+                        const updated = allReports.find(r => r.id === currentSelectedReport.id || r.tracking_code === currentSelectedReport.tracking_code);
+                        if (updated) {
+                            selectReport(updated);
+                        } else {
+                            document.getElementById('workspaceEmpty').style.display = 'flex';
+                            document.getElementById('workspaceContent').style.display = 'none';
+                            currentSelectedReport = null;
+                        }
+                    }
+                } else {
+                    document.getElementById('expertReportsList').innerHTML = `<div style="padding: 30px; text-align: center; color: #ef4444; font-size: 14px;">Ошибка загрузки обращений</div>`;
+                }
+            } catch (err) {
+                console.error(err);
+                document.getElementById('expertReportsList').innerHTML = `<div style="padding: 30px; text-align: center; color: #ef4444; font-size: 14px;">Ошибка соединения с сервером</div>`;
             }
         }
 
         function renderReportsList() {
             const listContainer = document.getElementById('expertReportsList');
             if (allReports.length === 0) {
-                listContainer.innerHTML = `<div style="padding: 30px; text-align: center; color: #64748b; font-size: 14px;">Нет обращений</div>`;
+                listContainer.innerHTML = `<div style="padding: 30px; text-align: center; color: #64748b; font-size: 14px;">Нет назначенных обращений</div>`;
                 return;
             }
 
@@ -191,7 +206,7 @@
             `).join('');
         }
 
-        function selectReport(report) {
+        async function selectReport(report) {
             currentSelectedReport = report;
             renderReportsList();
 
@@ -208,14 +223,26 @@
             badge.className = `badge ${report.priority === 'urgent' ? 'badge-danger' : report.priority === 'standard' ? 'badge-warning' : 'badge-info'}`;
             badge.innerText = report.priority || 'обычный';
 
-            renderChatMessages(report);
+            // Загружаем сообщения по обращению
+            await loadMessages(report.tracking_code);
         }
 
-        function renderChatMessages(report) {
-            const chatBox = document.getElementById('chatMessagesBox');
-            const messages = report.messages || [];
+        async function loadMessages(trackingCode) {
+            try {
+                const res = await fetch(`${API_URL}/api/reports/${trackingCode}/messages`);
+                if (res.ok) {
+                    const messages = await res.json();
+                    renderChatMessages(messages);
+                }
+            } catch (err) {
+                console.error("Ошибка загрузки сообщений", err);
+            }
+        }
 
-            if (messages.length === 0) {
+        function renderChatMessages(messages) {
+            const chatBox = document.getElementById('chatMessagesBox');
+
+            if (!messages || messages.length === 0) {
                 chatBox.innerHTML = `<div style="text-align: center; color: #64748b; font-size: 13px;">История пуста.</div>`;
                 return;
             }
@@ -229,48 +256,63 @@
             chatBox.scrollTop = chatBox.scrollHeight;
         }
 
-        function sendExpertMessage() {
+        async function sendExpertMessage() {
             if (!currentSelectedReport) return;
             const input = document.getElementById('chatMessageInput');
             const text = input.value.trim();
             if (!text) return;
 
-            if (!currentSelectedReport.messages) {
-                currentSelectedReport.messages = [];
+            try {
+                const res = await fetch(`${API_URL}/api/reports/${currentSelectedReport.tracking_code}/messages`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: text, sender_type: 'expert' })
+                });
+
+                if (res.ok) {
+                    input.value = '';
+                    await loadMessages(currentSelectedReport.tracking_code);
+                } else {
+                    alert('Ошибка отправки сообщения');
+                }
+            } catch (err) {
+                alert('Ошибка соединения с сервером');
             }
-
-            currentSelectedReport.messages.push({
-                sender_type: 'expert',
-                message: text
-            });
-
-            saveToLocalStorage();
-            input.value = '';
-            renderChatMessages(currentSelectedReport);
         }
 
-        function updateReportStatus() {
+        async function updateReportStatus() {
             if (!currentSelectedReport) return;
             const newStatus = document.getElementById('expertStatusSelect').value;
-            currentSelectedReport.status = newStatus;
-            saveToLocalStorage();
-            renderReportsList();
+
+            try {
+                const res = await fetch(`${API_URL}/api/reports/${currentSelectedReport.tracking_code}/status`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status: newStatus })
+                });
+
+                if (res.ok) {
+                    currentSelectedReport.status = newStatus;
+                    renderReportsList();
+                } else {
+                    alert('Ошибка обновления статуса');
+                }
+            } catch (err) {
+                alert('Ошибка соединения с сервером');
+            }
         }
 
         function saveExpertNotes() {
             if (!currentSelectedReport) return;
             const notesText = document.getElementById('expertNotesInput').value;
             currentSelectedReport.notes = notesText;
-            saveToLocalStorage();
+            // Здесь можно подключить сохранение заметок на бэкенд, если потребуется
             alert('Заметки сохранены');
         }
 
-        function saveToLocalStorage() {
-            const index = allReports.findIndex(r => r.tracking_code === currentSelectedReport.tracking_code);
-            if (index !== -1) {
-                allReports[index] = currentSelectedReport;
-                localStorage.setItem('otklik_reports', JSON.stringify(allReports));
-            }
+        function logout() {
+            localStorage.removeItem('user');
+            window.location.href = 'index.html';
         }
     </script>
 </body>

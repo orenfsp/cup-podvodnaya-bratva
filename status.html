@@ -40,6 +40,10 @@
         .chat-input-box input { font-family: inherit; font-size: 14px; padding: 10px 14px; }
 
         .error-msg { color: #991b1b; font-size: 14px; font-weight: 600; display: none; }
+        
+        /* Стили для сообщения об отклонении */
+        .rejected-msg-box { background: #fef2f2; border: 1px solid #fecaca; border-radius: 16px; padding: 20px; color: #991b1b; font-size: 15px; line-height: 1.6; display: none; }
+        .rejected-phone { font-weight: 700; font-size: 18px; margin-top: 8px; display: block; color: #7f1d1d; text-decoration: none; }
     </style>
 </head>
 <body>
@@ -74,18 +78,26 @@
                 <div id="resStatusBadge" class="status-badge"></div>
             </div>
 
-            <div>
-                <div style="font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: 700; margin-bottom: 6px;">Ваше исходное обращение</div>
-                <div id="resContent" style="background: #f8f9fa; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px; font-size: 14px; line-height: 1.4; color: #1e293b;"></div>
+            <!-- Блок сообщения для отклоненных заявок -->
+            <div id="rejectedMsgBox" class="rejected-msg-box">
+                Мы посмотрели твою ситуацию, но помочь с этим не сможем. Вот куда ещё можно обратиться: 
+                <a href="tel:89226189215" class="rejected-phone">89226189215</a>
             </div>
 
-            <div>
-                <div style="font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: 700; margin-bottom: 8px;">Диалог со специалистом</div>
-                <div class="chat-container">
-                    <div class="chat-messages" id="chatMessagesBox"></div>
-                    <div class="chat-input-box">
-                        <input type="text" id="applicantMessageInput" placeholder="Написать сообщение специалисту..." onkeydown="if(event.key==='Enter') sendApplicantMessage()">
-                        <button class="btn" style="padding: 10px 16px;" onclick="sendApplicantMessage()">Отправить</button>
+            <div id="normalContentWrapper" style="display: flex; flex-direction: column; gap: 20px;">
+                <div>
+                    <div style="font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: 700; margin-bottom: 6px;">Ваше исходное обращение</div>
+                    <div id="resContent" style="background: #f8f9fa; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px; font-size: 14px; line-height: 1.4; color: #1e293b;"></div>
+                </div>
+
+                <div>
+                    <div style="font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: 700; margin-bottom: 8px;">Диалог со специалистом</div>
+                    <div class="chat-container">
+                        <div class="chat-messages" id="chatMessagesBox"></div>
+                        <div class="chat-input-box">
+                            <input type="text" id="applicantMessageInput" placeholder="Написать сообщение специалисту..." onkeydown="if(event.key==='Enter') sendApplicantMessage()">
+                            <button class="btn" style="padding: 10px 16px;" onclick="sendApplicantMessage()">Отправить</button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -94,35 +106,60 @@
 
     <script>
         let currentReport = null;
+        const API_URL = "http://localhost:8000";
 
-        function checkStatus() {
-            const code = document.getElementById('trackInput').value.trim().toUpperCase();
+        async function checkStatus() {
+            const code = document.getElementById('trackInput').value.trim();
             const errorMsg = document.getElementById('errorMsg');
             const resultCard = document.getElementById('resultCard');
 
             if (!code) return;
 
-            const reports = JSON.parse(localStorage.getItem('otklik_reports') || '[]');
-            const found = reports.find(r => r.tracking_code.toUpperCase() === code);
+            try {
+                const response = await fetch(`${API_URL}/api/reports/check-status`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ tracking_code: code })
+                });
 
-            if (!found) {
+                if (!response.ok) {
+                    throw new Error('Не найдено');
+                }
+
+                const data = await response.json();
+                
+                errorMsg.style.display = 'none';
+                currentReport = data;
+                renderResult();
+                resultCard.style.display = 'flex';
+
+                loadMessages();
+            } catch (e) {
                 errorMsg.style.display = 'block';
                 resultCard.style.display = 'none';
                 currentReport = null;
-                return;
             }
+        }
 
-            errorMsg.style.display = 'none';
-            currentReport = found;
-            renderResult();
-            resultCard.style.display = 'flex';
+        async function loadMessages() {
+            if (!currentReport) return;
+            try {
+                const response = await fetch(`${API_URL}/api/reports/${currentReport.tracking_code}/messages`);
+                if (response.ok) {
+                    const messages = await response.json();
+                    currentReport.messages = messages;
+                    renderChat();
+                }
+            } catch (e) {
+                console.error("Ошибка загрузки сообщений", e);
+            }
         }
 
         function renderResult() {
             if (!currentReport) return;
 
             document.getElementById('resCode').innerText = currentReport.tracking_code;
-            document.getElementById('resContent').innerText = currentReport.content || 'Нет текста';
+            document.getElementById('resContent').innerText = currentReport.content || 'Текст обращения не указан';
 
             const badge = document.getElementById('resStatusBadge');
             const statuses = {
@@ -131,7 +168,8 @@
                 'in_progress': { text: 'Специалист разбирается в ситуации', bg: '#e0f2fe', color: '#0369a1' },
                 'needs_info': { text: 'Нужно уточнение', bg: '#fef3c7', color: '#92400e' },
                 'ready': { text: 'Ответ готов', bg: '#dcfce7', color: '#166534' },
-                'completed': { text: 'Завершено', bg: '#dcfce7', color: '#166534' }
+                'completed': { text: 'Завершено', bg: '#dcfce7', color: '#166534' },
+                'rejected': { text: 'Отклонено', bg: '#fee2e2', color: '#991b1b' }
             };
 
             const st = statuses[currentReport.status] || { text: currentReport.status, bg: '#f1f5f9', color: '#475569' };
@@ -139,10 +177,23 @@
             badge.style.backgroundColor = st.bg;
             badge.style.color = st.color;
 
-            renderChat();
+            // Логика отображения для отклоненных заявок
+            const rejectedMsgBox = document.getElementById('rejectedMsgBox');
+            const normalContentWrapper = document.getElementById('normalContentWrapper');
+
+            if (currentReport.status === 'rejected' || currentReport.status === 'отклонено') {
+                rejectedMsgBox.style.display = 'block';
+                normalContentWrapper.style.display = 'none';
+            } else {
+                rejectedMsgBox.style.display = 'none';
+                normalContentWrapper.style.display = 'flex';
+                renderChat();
+            }
         }
 
         function renderChat() {
+            if (currentReport && (currentReport.status === 'rejected' || currentReport.status === 'отклонено')) return;
+            
             const chatBox = document.getElementById('chatMessagesBox');
             const messages = currentReport.messages || [];
 
@@ -154,49 +205,50 @@
             chatBox.innerHTML = messages.map(m => `
                 <div class="message ${m.sender_type === 'expert' ? 'expert' : 'applicant'}">
                     <div style="font-size: 10px; opacity: 0.8; margin-bottom: 2px;">${m.sender_type === 'expert' ? 'Специалист' : 'Вы'}</div>
-                    <div>${m.message}</div>
+                    <div>${m.message || m.text}</div>
                 </div>
             `).join('');
             chatBox.scrollTop = chatBox.scrollHeight;
         }
 
-        function sendApplicantMessage() {
+        async function sendApplicantMessage() {
             if (!currentReport) return;
             const input = document.getElementById('applicantMessageInput');
             const text = input.value.trim();
             if (!text) return;
 
-            if (!currentReport.messages) {
-                currentReport.messages = [];
+            try {
+                const response = await fetch(`${API_URL}/api/reports/${currentReport.tracking_code}/messages`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: text, sender_type: 'applicant' })
+                });
+
+                if (response.ok) {
+                    input.value = '';
+                    loadMessages();
+                }
+            } catch (e) {
+                console.error("Ошибка отправки сообщения", e);
             }
-
-            currentReport.messages.push({
-                sender_type: 'applicant',
-                message: text
-            });
-
-            // Сохраняем в localStorage и обновляем общую базу обращений
-            let reports = JSON.parse(localStorage.getItem('otklik_reports') || '[]');
-            const index = reports.findIndex(r => r.tracking_code === currentReport.tracking_code);
-            if (index !== -1) {
-                reports[index] = currentReport;
-                localStorage.setItem('otklik_reports', JSON.stringify(reports));
-            }
-
-            input.value = '';
-            renderChat();
         }
 
         setInterval(() => {
-            if (currentReport) {
-                const reports = JSON.parse(localStorage.getItem('otklik_reports') || '[]');
-                const found = reports.find(r => r.tracking_code === currentReport.tracking_code);
-                if (found) {
-                    currentReport = found;
+            if (currentReport && currentReport.tracking_code) {
+                fetch(`${API_URL}/api/reports/check-status`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ tracking_code: currentReport.tracking_code })
+                })
+                .then(res => res.json())
+                .then(data => {
+                    currentReport = data;
                     renderResult();
-                }
+                    loadMessages();
+                })
+                .catch(() => {});
             }
-        }, 3000);
+        }, 5000);
     </script>
 </body>
 </html>

@@ -1,16 +1,18 @@
 import os
 import re
+from datetime import datetime
 from typing import List, Optional
 from fastapi import FastAPI, Depends, HTTPException, status, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy import create_engine, text
+from sqlalchemy.exc import IntegrityError
 from pydantic import BaseModel
 
 import pymorphy3
 from thefuzz import fuzz
 
-from models import Base, Report, ReportStatus, Priority, User, Category, AuditLog, RoutingRule
+from models import Base, Report, ReportStatus, Priority, User, Category, AuditLog, RoutingRule, Message
 from schemas import ReportCreate, ReportResponse, StatusCheckRequest
 from utils import generate_tracking_code
 
@@ -21,13 +23,13 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 app = FastAPI(title="Otklik API")
 
-# Встроенный стандартный CORS (надежно обрабатывает все префлайт запросы и методы)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 @app.on_event("startup")
@@ -106,6 +108,26 @@ def health_check():
         return {"status": "error", "database": str(e)}
 
 
+# --- Авторизация сотрудников ---
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+@app.post("/api/auth/login")
+def login_user(payload: LoginRequest, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.username == payload.username).first()
+    if not user or user.hashed_password != payload.password:
+        raise HTTPException(status_code=401, detail="Неверный логин или пароль")
+    
+    return {
+        "message": "Успешный вход",
+        "role": user.role,  # ожидается "expert", "operator" или "admin"
+        "username": user.username,
+        "full_name": getattr(user, "full_name", user.username),
+        "id": user.id
+    }
+
+
 @app.post("/api/reports", response_model=dict, status_code=status.HTTP_201_CREATED)
 def create_report(report_data: ReportCreate, db: Session = Depends(get_db)):
     tracking_code = generate_tracking_code()
@@ -119,7 +141,6 @@ def create_report(report_data: ReportCreate, db: Session = Depends(get_db)):
 
     contact_info_val = getattr(report_data, 'contact_info', None)
 
-    # Автоматическое назначение эксперта по правилам маршрутизации
     assigned_expert = None
     rule = db.query(RoutingRule).filter(RoutingRule.category_id == str(report_data.category_id)).first()
     if rule:
@@ -150,9 +171,8 @@ def create_report(report_data: ReportCreate, db: Session = Depends(get_db)):
         "expert_id": new_report.expert_id
     }
 
-
 @app.get("/api/reports")
-def get_reports(status: str = None, db: Session = Depends(get_db)):
+def get_reports(expert_id: Optional[str] = None, status: Optional[str] = None, db: Session = Depends(get_db)):
     query = db.query(Report)
     if status:
         status_map = {
@@ -171,6 +191,13 @@ def get_reports(status: str = None, db: Session = Depends(get_db)):
         db_status = status_map.get(clean_status, clean_status)
         query = query.filter(Report.status == db_status)
         
+    if expert_id is not None:
+        try:
+            int_expert_id = int(expert_id)
+            query = query.filter(Report.expert_id == int_expert_id)
+        except ValueError:
+            query = query.filter(Report.expert_id == expert_id)
+
     reports = query.order_by(Report.created_at.desc()).all()
     
     return [
@@ -221,62 +248,86 @@ class AssignExpertRequest(BaseModel):
 
 @app.patch("/api/reports/{report_id}/assign")
 def assign_expert(report_id: str, payload: AssignExpertRequest, db: Session = Depends(get_db)):
-    report = None
     try:
-        int_id = int(report_id)
-        report = db.query(Report).filter(Report.id == int_id).first()
-    except ValueError:
-        report = db.query(Report).filter(Report.tracking_code == report_id).first()
+        report = None
+        try:
+            int_id = int(report_id)
+            report = db.query(Report).filter(Report.id == int_id).first()
+        except ValueError:
+            report = db.query(Report).filter(Report.tracking_code == report_id).first()
 
-    if not report:
-        raise HTTPException(status_code=404, detail="Обращение не найдено")
-    
-    old_expert = str(getattr(report, "expert_id", "не назначен"))
-    
-    # Пытаемся сохранить эксперта как число (если передан ID), иначе как строку
-    expert_val = payload.expert_name
-    try:
-        expert_val = int(expert_val)
-    except ValueError:
-        pass
+        if not report:
+            raise HTTPException(status_code=404, detail="Обращение не найдено")
+        
+        old_expert = str(getattr(report, "expert_id", "не назначен"))
+        
+        expert_input = payload.expert_name
+        expert_val = expert_input
+        
+        try:
+            int_val = int(expert_input)
+            user_by_id = db.query(User).filter(User.id == int_val).first()
+            if user_by_id:
+                expert_val = user_by_id.id
+        except ValueError:
+            user_by_name = db.query(User).filter(
+                (User.username == expert_input) | (User.full_name == expert_input)
+            ).first()
+            if user_by_name:
+                expert_val = user_by_name.id
 
-    report.expert_id = expert_val
+        report.expert_id = expert_val
 
-    try:
-        audit = AuditLog(
-            action="MANUAL_EXPERT_ASSIGN",
-            target_report_id=report.tracking_code,
-            reason=payload.reason,
-            details=f"Эксперт изменен с '{old_expert}' на '{payload.expert_name}'"
-        )
-        db.add(audit)
-    except Exception:
-        pass
+        db.commit()
+        
+        try:
+            audit = AuditLog(
+                action="MANUAL_EXPERT_ASSIGN",
+                target_report_id=report.tracking_code,
+                reason=payload.reason,
+                details=f"Эксперт изменен с '{old_expert}' на '{payload.expert_name}'"
+            )
+            db.add(audit)
+            db.commit()
+        except Exception:
+            db.rollback()
 
-    db.commit()
-    db.refresh(report)
-    
-    return {"message": "Эксперт успешно назначен", "expert_id": report.expert_id}
+        db.refresh(report)
+        
+        return {"message": "Эксперт успешно назначен", "expert_id": report.expert_id}
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/api/reports/check-status", response_model=ReportResponse)
+@app.post("/api/reports/check-status")
 def check_report_status(payload: StatusCheckRequest, db: Session = Depends(get_db)):
-    report = db.query(Report).filter(Report.tracking_code == payload.tracking_code).first()
+    clean_code = payload.tracking_code.strip()
+    report = db.query(Report).filter(Report.tracking_code == clean_code).first()
+    
+    if not report:
+        report = db.query(Report).filter(db.func.lower(Report.tracking_code) == clean_code.lower()).first()
+
     if not report:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Обращение с таким трек-номером не найдено. Проверьте правильность ввода."
         )
-    
-    return ReportResponse(
-        id=report.id,
-        tracking_code=report.tracking_code,
-        applicant_type=report.applicant_type,
-        status=report.status,
-        priority=report.priority,
-        is_crisis=report.is_crisis,
-        created_at=report.created_at.isoformat()
-    )
+    return {
+        "id": report.id,
+        "tracking_code": report.tracking_code,
+        "applicant_type": report.applicant_type,
+        "category_id": report.category_id,
+        "content": report.content,
+        "status": report.status.value if hasattr(report.status, 'value') else report.status,
+        "priority": report.priority.value if hasattr(report.priority, 'value') else report.priority,
+        "is_crisis": report.is_crisis,
+        "created_at": report.created_at.isoformat()
+    }
 
 
 @app.patch("/api/reports/{report_id}/status")
@@ -332,6 +383,7 @@ def update_report_status(report_id: str, payload: dict, db: Session = Depends(ge
 class MessageCreate(BaseModel):
     message: str
     sender_type: str = "applicant"
+    created_at: Optional[str] = None
 
 @app.get("/api/reports/{tracking_code}/messages")
 def get_report_messages(tracking_code: str, db: Session = Depends(get_db)):
@@ -350,20 +402,38 @@ def get_report_messages(tracking_code: str, db: Session = Depends(get_db)):
         for m in messages
     ]
 
-@app.post("/api/reports/{tracking_code}/messages")
+@app.post("/api/reports/{tracking_code}/messages", status_code=status.HTTP_201_CREATED)
 def send_report_message(tracking_code: str, payload: MessageCreate, db: Session = Depends(get_db)):
     report = db.query(Report).filter(Report.tracking_code == tracking_code).first()
     if not report:
         raise HTTPException(status_code=404, detail="Обращение не найдено")
     
-    return {
-        "status": "success",
-        "message": payload.message,
+    msg_data = {
+        "report_id": report.id,
+        "text": payload.message,
         "sender_type": payload.sender_type
+    }
+    
+    if payload.created_at:
+        try:
+            msg_data["created_at"] = datetime.fromisoformat(payload.created_at.replace('Z', '+00:00'))
+        except Exception:
+            pass
+
+    new_message = Message(**msg_data)
+    db.add(new_message)
+    db.commit()
+    db.refresh(new_message)
+    
+    return {
+        "id": new_message.id,
+        "message": new_message.text,
+        "sender_type": new_message.sender_type,
+        "created_at": new_message.created_at.isoformat()
     }
 
 
-# --- Админские эндпоинты (Категории, Юзеры, Маршрутизация, Аудит) ---
+# --- Админские эндпоинты ---
 
 class CategoryCreate(BaseModel):
     name: str
@@ -417,6 +487,64 @@ def admin_create_user(payload: UserCreateAdmin, db: Session = Depends(get_db)):
     db.refresh(user)
     return {"message": f"Пользователь {payload.username} успешно создан", "id": user.id}
 
+@app.delete("/api/admin/users/{user_id}")
+def admin_delete_user(user_id: str, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+    
+    try:
+        db.delete(user)
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=400, 
+            detail="Невозможно удалить пользователя, так как с ним связаны активные обращения или правила маршрутизации."
+        )
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+        
+    return {"message": "Пользователь успешно удален"}
+
+@app.delete("/api/admin/categories/{category_id}")
+def admin_delete_category(category_id: str, db: Session = Depends(get_db)):
+    category = db.query(Category).filter(Category.id == category_id).first()
+    if not category:
+        raise HTTPException(status_code=404, detail="Категория не найдена")
+    
+    try:
+        db.delete(category)
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=400, 
+            detail="Невозможно удалить категорию, так как с ней связаны обращения или правила маршрутизации."
+        )
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+        
+    return {"message": "Категория успешно удалена"}
+
+
+@app.delete("/api/admin/routing-rules/{rule_id}")
+def admin_delete_routing_rule(rule_id: str, db: Session = Depends(get_db)):
+    rule = db.query(RoutingRule).filter(RoutingRule.id == rule_id).first()
+    if not rule:
+        raise HTTPException(status_code=404, detail="Правило маршрутизации не найдено")
+    
+    try:
+        db.delete(rule)
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+        
+    return {"message": "Правило маршрутизации успешно удалено"}
+
 
 class RoutingRuleCreate(BaseModel):
     category_id: str
@@ -468,12 +596,12 @@ def admin_get_audit_logs(db: Session = Depends(get_db)):
 @app.get("/api/experts")
 def get_experts(db: Session = Depends(get_db)):
     try:
-        users = db.query(User.id, User.username, User.full_name, User.role).all()
+        users = db.query(User).filter(User.role == "expert").all()
         result = []
         for u in users:
             result.append({
                 "id": u.id,
-                "name": u.full_name or u.username
+                "name": getattr(u, "full_name", None) or u.username
             })
         return result
     except Exception as e:

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Платформа «Отклик» — Панель модератора</title>
+    <title>Платформа «Отклик» — Панель оператора</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
         body { background-color: #f8f9fa; color: #1e293b; min-height: 100vh; display: flex; flex-direction: column; }
@@ -38,13 +38,20 @@
         .btn-secondary:hover { background: #e2e8f0; }
         .btn-admin { background: #4f46e5; }
         .btn-admin:hover { background: #4338ca; }
+        .btn-chat { background: #10b981; }
+        .btn-chat:hover { background: #059669; }
 
         .modal-backdrop { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px); display: none; align-items: center; justify-content: center; z-index: 100; padding: 20px; }
-        .modal { background: white; border-radius: 24px; width: 100%; max-width: 600px; padding: 32px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); display: flex; flex-direction: column; gap: 20px; position: relative; max-height: 90vh; overflow-y: auto; }
+        .modal { background: white; border-radius: 24px; width: 100%; max-width: 700px; padding: 32px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); display: flex; flex-direction: column; gap: 20px; position: relative; max-height: 90vh; overflow-y: auto; }
         .close-btn { position: absolute; top: 20px; right: 20px; background: none; border: none; font-size: 24px; color: #94a3b8; cursor: pointer; }
         .close-btn:hover { color: #0f172a; }
         
         .empty-state { text-align: center; padding: 40px; color: #64748b; font-size: 14px; }
+        
+        /* Стили для чата внутри модального окна */
+        .chat-container { display: flex; flex-direction: column; height: 350px; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; background: #fff; }
+        .chat-messages { flex: 1; padding: 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; background: #f8f9fa; }
+        .chat-input-box { display: flex; padding: 12px; border-top: 1px solid #e2e8f0; background: #fff; gap: 8px; }
     </style>
 </head>
 <body onload="loadReports()">
@@ -53,7 +60,7 @@
         <div class="container header-content">
             <div class="logo-box">
                 <div class="logo-icon">🛡️</div>
-                <div class="logo-text">Панель модератора</div>
+                <div class="logo-text">Панель оператора</div>
             </div>
             <div style="display: flex; gap: 10px; align-items: center;">
                 <button class="btn btn-admin" onclick="requestAdminAccess()">Перейти в админку</button>
@@ -88,7 +95,7 @@
                         <th>Статус</th>
                         <th>Эксперт</th>
                         <th>Дата</th>
-                        <th>Действие</th>
+                        <th>Действия</th>
                     </tr>
                 </thead>
                 <tbody id="reportsTableBody">
@@ -100,11 +107,11 @@
         </div>
     </main>
 
-    <!-- Модальное окно деталей обращения -->
+    <!-- Модальное окно чата и управления -->
     <div id="reportModal" class="modal-backdrop">
         <div class="modal">
             <button class="close-btn" onclick="closeModal()">&times;</button>
-            <h2 style="font-size: 22px; font-weight: 800; color: #0f172a;">Детали обращения</h2>
+            <h2 style="font-size: 22px; font-weight: 800; color: #0f172a;" id="modalTitle">Обращение</h2>
             
             <div style="display: flex; flex-direction: column; gap: 14px; font-size: 14px;">
                 <div><strong>Трек-номер:</strong> <span id="modalTracking" style="font-family: monospace; color: #0284c7;"></span></div>
@@ -113,13 +120,26 @@
                 <div><strong>Приоритет:</strong> <span id="modalPriority"></span></div>
                 <div><strong>Эксперт:</strong> <span id="modalExpert"></span></div>
                 <div><strong>Текст обращения:</strong></div>
-                <div id="modalContent" style="background: #f8f9fa; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; color: #1e293b; line-height: 1.5; white-space: pre-wrap; word-break: break-word; overflow-wrap: break-word;"></div>
+                <div id="modalContent" style="background: #f8f9fa; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; color: #1e293b; line-height: 1.5; white-space: pre-wrap; word-break: break-word;"></div>
+            </div>
+
+            <!-- Блок Безопасного чата с заявителем -->
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+                <label style="font-size: 12px; font-weight: 700; color: #64748b; text-transform: uppercase;">Безопасный чат с заявителем</label>
+                <div class="chat-container">
+                    <div id="chatMessages" class="chat-messages">
+                        <div class="text-center text-slate-400 text-sm py-4">Загрузка сообщений...</div>
+                    </div>
+                    <div class="chat-input-box">
+                        <input type="text" id="chatMessageInput" placeholder="Ответить заявителю..." onkeypress="handleChatKeyPress(event)" style="flex: 1;">
+                        <button class="btn" onclick="sendOperatorMessage()">Отправить</button>
+                    </div>
+                </div>
             </div>
 
             <div style="display: flex; flex-direction: column; gap: 8px;">
                 <label style="font-size: 12px; font-weight: 700; color: #64748b; text-transform: uppercase;">Назначить эксперта</label>
                 <div style="display: flex; gap: 8px;">
-                    <!-- Заменили input на select -->
                     <select id="expertSelect" style="flex: 1;">
                         <option value="">Загрузка экспертов...</option>
                     </select>
@@ -140,7 +160,7 @@
 
             <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 10px;">
                 <button class="btn btn-secondary" onclick="closeModal()">Закрыть</button>
-                <button class="btn" onclick="updateReportStatus()">Сохранить</button>
+                <button class="btn" onclick="updateReportStatus()">Сохранить статус</button>
             </div>
         </div>
     </div>
@@ -161,6 +181,7 @@
 
     <script>
         let currentReportId = null;
+        let chatInterval = null;
 
         async function loadReports() {
             const status = document.getElementById('statusFilter').value;
@@ -189,7 +210,12 @@
                             <td><strong>${r.status}</strong></td>
                             <td>${r.expert_id || 'Не назначен'}</td>
                             <td style="color: #64748b; font-size: 12px;">${new Date(r.created_at).toLocaleString()}</td>
-                            <td><button class="btn" onclick='openModal(${JSON.stringify(r)})'>Открыть</button></td>
+                            <td>
+                                <div style="display: flex; gap: 6px;">
+                                    <button class="btn" onclick='openModal(${JSON.stringify(r)})'>Детали</button>
+                                    <button class="btn btn-chat" onclick='openModal(${JSON.stringify(r)})'>Чат</button>
+                                </div>
+                            </td>
                         </tr>
                     `).join('');
                 } else {
@@ -201,17 +227,14 @@
             }
         }
 
-        // Функция загрузки списка экспертов в выпадающий список
         async function loadExperts(currentExpertId) {
             const select = document.getElementById('expertSelect');
             try {
-                const response = await fetch('http://127.0.0.1:8000/api/experts'); // Замените путь на реальный эндпоинт экспертов, если он отличается
+                const response = await fetch('http://127.0.0.1:8000/api/experts');
                 if (response.ok) {
                     const experts = await response.json();
-                    
                     let optionsHtml = `<option value="">-- Не назначен --</option>`;
                     experts.forEach(exp => {
-                        // Подставьте свой ключ (например, exp.name или exp.id), в зависимости от того, как бэкенд возвращает данные
                         const expertValue = exp.name || exp.id || exp; 
                         const isSelected = expertValue === currentExpertId ? 'selected' : '';
                         optionsHtml += `<option value="${expertValue}" ${isSelected}>${expertValue}</option>`;
@@ -226,6 +249,71 @@
             }
         }
 
+        async function loadChatMessages() {
+            if (!currentReportId) return;
+            try {
+                const response = await fetch(`http://127.0.0.1:8000/api/reports/${currentReportId}/messages`);
+                if (response.ok) {
+                    const messages = await response.json();
+                    const container = document.getElementById('chatMessages');
+
+                    if (messages.length === 0) {
+                        container.innerHTML = '<div class="text-center text-slate-400 text-sm py-6">В этом чате пока нет сообщений.</div>';
+                        return;
+                    }
+
+                    container.innerHTML = messages.map(m => {
+                        const isApplicant = m.sender_type === 'applicant';
+                        const alignClass = isApplicant ? 'mr-auto bg-white text-slate-900 border border-slate-200' : 'ml-auto bg-sky-600 text-white';
+                        const senderTitle = isApplicant ? 'Заявитель' : 'Оператор / Эксперт';
+                        
+                        return `
+                            <div class="max-w-[85%] rounded-2xl px-3 py-2 text-xs shadow-sm space-y-1 ${alignClass}">
+                                <div class="font-bold uppercase tracking-wider opacity-75 text-[9px]">${senderTitle}</div>
+                                <div class="leading-relaxed whitespace-pre-wrap break-words">${m.message}</div>
+                                <div class="text-[9px] text-right opacity-60">${new Date(m.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
+                            </div>
+                        `;
+                    }).join('');
+                    
+                    container.scrollTop = container.scrollHeight;
+                }
+            } catch (error) {
+                console.error(error);
+            }
+        }
+
+        async function sendOperatorMessage() {
+            const input = document.getElementById('chatMessageInput');
+            const text = input.value.trim();
+            if (!text || !currentReportId) return;
+
+            try {
+                const response = await fetch(`http://127.0.0.1:8000/api/reports/${currentReportId}/messages`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    // Отправляем sender_type равный 'expert' (или 'operator' — в зависимости от того, что принимает бэкенд)
+                    body: JSON.stringify({ message: text, sender_type: 'expert' })
+                });
+
+                if (response.ok) {
+                    input.value = '';
+                    loadChatMessages();
+                } else {
+                    alert('Не удалось отправить сообщение');
+                }
+            } catch (error) {
+                console.error(error);
+                alert('Ошибка соединения с сервером');
+            }
+        }
+
+        function handleChatKeyPress(e) {
+            if (e.key === 'Enter') {
+                sendOperatorMessage();
+            }
+        }
+
         function openModal(report) {
             currentReportId = report.tracking_code;
             document.getElementById('modalTracking').innerText = report.tracking_code;
@@ -236,15 +324,23 @@
             document.getElementById('modalContent').innerText = report.content;
             document.getElementById('modalStatusSelect').value = report.status;
             
-            // Загружаем список экспертов и передаем текущего назначенного эксперта для автовыбора
             loadExperts(report.expert_id);
+            loadChatMessages();
             
+            // Запускаем автообновление чата каждые 4 секунды, пока открыто окно
+            if (chatInterval) clearInterval(chatInterval);
+            chatInterval = setInterval(loadChatMessages, 4000);
+
             document.getElementById('reportModal').style.display = 'flex';
         }
 
         function closeModal() {
             document.getElementById('reportModal').style.display = 'none';
             currentReportId = null;
+            if (chatInterval) {
+                clearInterval(chatInterval);
+                chatInterval = null;
+            }
         }
 
         function requestAdminAccess() {
@@ -301,10 +397,7 @@
 
         async function updateReportStatus() {
             const statusSelect = document.getElementById('modalStatusSelect');
-            if (!statusSelect) {
-                alert('Элемент выбора статуса не найден');
-                return;
-            }
+            if (!statusSelect) return;
             const newStatus = statusSelect.value;
             try {
                 const response = await fetch(`http://127.0.0.1:8000/api/reports/${currentReportId}/status`, {
