@@ -14,15 +14,15 @@ class ApplicantType(str, enum.Enum):
     teacher = "teacher"
 
 class ReportStatus(str, enum.Enum):
-    new = "new"                             # Новое, ждёт оператора
-    distributed = "distributed"             # Распределено оператором
-    in_progress = "in_progress"             # В работе у эксперта
-    need_info = "need_info"                 # Нужно уточнение от заявителя
-    ready = "ready"                         # Ответ готов
-    returned = "returned"                   # Возвращено заявителем (не помогло)
-    completed = "completed"                 # Завершено (подтверждено)
-    rejected = "rejected"                   # Отклонено (спам / вне компетенции)
-    auto_closed = "auto_closed"             # Закрыто без ответа
+    new = "new"                               # Новое
+    distributed = "distributed"               # Распределено оператором
+    in_progress = "in_progress"               # В работе
+    clarification = "clarification"           # Уточнение
+    answer_ready = "answer_ready"             # Ответ готов
+    returned = "returned"                     # Возвращено
+    closed_no_answer = "closed_no_answer"     # Закрыто без ответа
+    completed = "completed"                   # Завершено
+    rejected = "rejected"                     # Отклонено
 
 class Priority(str, enum.Enum):
     low = "low"

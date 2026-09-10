@@ -507,22 +507,31 @@ def update_report_status(report_id: str, payload: dict, db: Session = Depends(ge
 
         if not report:
             raise HTTPException(status_code=404, detail="Обращение не найдено")
-        
+
         new_status = payload.get("status")
         if new_status:
             status_map = {
                 "new": ReportStatus.new,
                 "новое": ReportStatus.new,
+                "distributed": ReportStatus.distributed,
+                "распределено": ReportStatus.distributed,
                 "in_progress": ReportStatus.in_progress,
                 "в работе": ReportStatus.in_progress,
-                "resolved": ReportStatus.ready,
-                "решено": ReportStatus.ready,
+                "clarification": ReportStatus.clarification,
+                "уточнение": ReportStatus.clarification,
+                "answer_ready": ReportStatus.answer_ready,
+                "ответ готов": ReportStatus.answer_ready,
+                "resolved": ReportStatus.answer_ready,
+                "решено": ReportStatus.answer_ready,
+                "returned": ReportStatus.returned,
+                "возвращено": ReportStatus.returned,
+                "closed_no_answer": ReportStatus.closed_no_answer,
+                "закрыто без ответа": ReportStatus.closed_no_answer,
                 "completed": ReportStatus.completed,
                 "завершено": ReportStatus.completed,
                 "rejected": ReportStatus.rejected,
                 "отклонено": ReportStatus.rejected
             }
-            
             clean_status = str(new_status).strip().lower()
             if clean_status in status_map:
                 report.status = status_map[clean_status]

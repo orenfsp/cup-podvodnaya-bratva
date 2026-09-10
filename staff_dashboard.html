@@ -228,12 +228,14 @@
 
         const statusLabels = {
             'new': 'Новое',
-            'in_progress': 'Распределено',
-            'ready': 'Решено',
-            'resolved': 'Решено',
-            'completed': 'Завершено',
-            'rejected': 'Отклонено'
-        };
+            'in_progress': 'В работе',
+            'clarification': 'Уточнение',
+            'answer_ready': 'Ответ готов',
+             'returned': 'Возвращено',
+              'closed_no_answer': 'Закрыто без ответа',
+                'resolved': 'Решено',
+                    'closed': 'Закрыто'
+};
 
         async function loadReports() {
             const status = document.getElementById('statusFilter').value;
