@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Платформа «Отклик» — Панель оператора</title>
+    <title>Платформа «Отклик» — Панель сотрудников</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
         body { background-color: #f8f9fa; color: #1e293b; min-height: 100vh; display: flex; flex-direction: column; }
@@ -18,7 +18,7 @@
         .dashboard-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; }
         h1 { font-size: 28px; font-weight: 800; color: #0f172a; }
         
-        .filters { display: flex; gap: 12px; flex-wrap: wrap; }
+        .filters { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
         select, input { background: #fff; border: 1px solid #cbd5e1; border-radius: 12px; padding: 10px 14px; font-size: 14px; outline: none; width: 100%; }
         
         .table-card { background: white; border: 1px solid #e2e8f0; border-radius: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.02); overflow: hidden; }
@@ -40,6 +40,8 @@
         .btn-admin:hover { background: #4338ca; }
         .btn-chat { background: #10b981; }
         .btn-chat:hover { background: #059669; }
+        .btn-success { background: #059669; color: white; }
+        .btn-success:hover { background: #047857; }
 
         .modal-backdrop { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px); display: none; align-items: center; justify-content: center; z-index: 100; padding: 20px; }
         .modal { background: white; border-radius: 24px; width: 100%; max-width: 700px; padding: 32px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); display: flex; flex-direction: column; gap: 20px; position: relative; max-height: 90vh; overflow-y: auto; }
@@ -48,10 +50,12 @@
         
         .empty-state { text-align: center; padding: 40px; color: #64748b; font-size: 14px; }
         
-        /* Стили для чата внутри модального окна */
         .chat-container { display: flex; flex-direction: column; height: 350px; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; background: #fff; }
         .chat-messages { flex: 1; padding: 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; background: #f8f9fa; }
         .chat-input-box { display: flex; padding: 12px; border-top: 1px solid #e2e8f0; background: #fff; gap: 8px; }
+
+        .attachment-chip { display: inline-flex; align-items: center; gap: 6px; background: #f1f5f9; border: 1px solid #cbd5e1; padding: 6px 12px; border-radius: 8px; font-size: 12px; color: #0f172a; text-decoration: none; font-weight: 500; }
+        .attachment-chip:hover { background: #e2e8f0; }
     </style>
 </head>
 <body onload="loadReports()">
@@ -60,7 +64,7 @@
         <div class="container header-content">
             <div class="logo-box">
                 <div class="logo-icon">🛡️</div>
-                <div class="logo-text">Панель оператора</div>
+                <div class="logo-text">Панель сотрудников</div>
             </div>
             <div style="display: flex; gap: 10px; align-items: center;">
                 <button class="btn btn-admin" onclick="requestAdminAccess()">Перейти в админку</button>
@@ -73,14 +77,16 @@
         <div class="dashboard-header">
             <h1>Поступившие обращения</h1>
             <div class="filters">
-                <select id="statusFilter" onchange="loadReports()">
+                <select id="statusFilter" onchange="loadReports()" style="width: auto; min-width: 180px;">
                     <option value="">Все статусы</option>
                     <option value="new">Новое</option>
-                    <option value="in_progress">В работе</option>
+                    <option value="in_progress">Распределено</option>
                     <option value="resolved">Решено</option>
                     <option value="completed">Завершено</option>
                     <option value="rejected">Отклонено</option>
                 </select>
+                <button class="btn btn-success" onclick="exportReports('xlsx')">📥 Excel</button>
+                <button class="btn" onclick="exportReports('csv')">📥 CSV</button>
             </div>
         </div>
 
@@ -107,7 +113,7 @@
         </div>
     </main>
 
-    <!-- Модальное окно чата и управления -->
+    <!-- Модальное окно деталей и чата -->
     <div id="reportModal" class="modal-backdrop">
         <div class="modal">
             <button class="close-btn" onclick="closeModal()">&times;</button>
@@ -116,14 +122,50 @@
             <div style="display: flex; flex-direction: column; gap: 14px; font-size: 14px;">
                 <div><strong>Трек-номер:</strong> <span id="modalTracking" style="font-family: monospace; color: #0284c7;"></span></div>
                 <div><strong>Заявитель:</strong> <span id="modalApplicant"></span></div>
-                <div><strong>Категория:</strong> <span id="modalCategory"></span></div>
-                <div><strong>Приоритет:</strong> <span id="modalPriority"></span></div>
-                <div><strong>Эксперт:</strong> <span id="modalExpert"></span></div>
+                
+                <!-- БЛОК КОНТАКТА ЗАЯВИТЕЛЯ -->
+                <div style="background: #f0fdf4; border: 1px solid #bbf7d0; padding: 10px 14px; border-radius: 10px;">
+                    <strong>Контакт для связи:</strong> <span id="modalContact" style="color: #166534; font-weight: 600;">Не указан (анонимно)</span>
+                </div>
+
                 <div><strong>Текст обращения:</strong></div>
                 <div id="modalContent" style="background: #f8f9fa; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; color: #1e293b; line-height: 1.5; white-space: pre-wrap; word-break: break-word;"></div>
+
+                <!-- БЛОК ПРИКРЕПЛЕННЫХ ФАЙЛОВ -->
+                <div id="attachmentsSection" style="display: flex; flex-direction: column; gap: 6px;">
+                    <strong>Прикрепленные файлы:</strong>
+                    <div id="modalAttachments" style="display: flex; flex-wrap: wrap; gap: 8px;">
+                        <span style="color: #64748b; font-size: 13px;">Нет файлов</span>
+                    </div>
+                </div>
             </div>
 
-            <!-- Блок Безопасного чата с заявителем -->
+            <!-- Уточнение категории и приоритета -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; background: #f1f5f9; padding: 14px; border-radius: 14px;">
+                <div style="display: flex; flex-direction: column; gap: 6px;">
+                    <label style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase;">Категория</label>
+                    <select id="modalCategorySelect">
+                        <option value="1">Буллинг и травля</option>
+                        <option value="2">Психологическое состояние (кризис)</option>
+                        <option value="3">Конфликты с преподавателями / руководством</option>
+                        <option value="4">Проблемы с учебой и нагрузкой</option>
+                        <option value="5">Бытовые и финансовые трудности</option>
+                        <option value="6">Другое</option>
+                    </select>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 6px;">
+                    <label style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase;">Приоритет</label>
+                    <select id="modalPrioritySelect">
+                        <option value="standard">Стандартный</option>
+                        <option value="urgent">Срочный (Высокий риск)</option>
+                    </select>
+                </div>
+                <div style="grid-column: span 2; display: flex; justify-content: flex-end;">
+                    <button class="btn btn-secondary" onclick="updateCategoryAndPriority()" style="font-size: 12px; padding: 6px 12px;">Обновить категорию и приоритет</button>
+                </div>
+            </div>
+
+            <!-- Чат с заявителем -->
             <div style="display: flex; flex-direction: column; gap: 8px;">
                 <label style="font-size: 12px; font-weight: 700; color: #64748b; text-transform: uppercase;">Безопасный чат с заявителем</label>
                 <div class="chat-container">
@@ -132,7 +174,7 @@
                     </div>
                     <div class="chat-input-box">
                         <input type="text" id="chatMessageInput" placeholder="Ответить заявителю..." onkeypress="handleChatKeyPress(event)" style="flex: 1;">
-                        <button class="btn" onclick="sendOperatorMessage()">Отправить</button>
+                        <button class="btn" onclick="sendStaffMessage()">Отправить</button>
                     </div>
                 </div>
             </div>
@@ -151,7 +193,7 @@
                 <label style="font-size: 12px; font-weight: 700; color: #64748b; text-transform: uppercase;">Изменить статус</label>
                 <select id="modalStatusSelect">
                     <option value="new">Новое</option>
-                    <option value="in_progress">В работе</option>
+                    <option value="in_progress">Распределено</option>
                     <option value="resolved">Решено</option>
                     <option value="completed">Завершено</option>
                     <option value="rejected">Отклонено</option>
@@ -165,6 +207,7 @@
         </div>
     </div>
 
+    <!-- Модальное окно PIN-кода админки -->
     <div id="adminPinModal" class="modal-backdrop">
         <div class="modal" style="max-width: 400px;">
             <button class="close-btn" onclick="closeAdminModal()">&times;</button>
@@ -182,6 +225,15 @@
     <script>
         let currentReportId = null;
         let chatInterval = null;
+
+        const statusLabels = {
+            'new': 'Новое',
+            'in_progress': 'Распределено',
+            'ready': 'Решено',
+            'resolved': 'Решено',
+            'completed': 'Завершено',
+            'rejected': 'Отклонено'
+        };
 
         async function loadReports() {
             const status = document.getElementById('statusFilter').value;
@@ -207,7 +259,7 @@
                             <td>${r.applicant_type}</td>
                             <td>${r.category_id || 'Не указана'}</td>
                             <td><span class="badge ${r.priority === 'urgent' ? 'badge-danger' : r.priority === 'standard' ? 'badge-warning' : 'badge-info'}">${r.priority}</span></td>
-                            <td><strong>${r.status}</strong></td>
+                            <td><strong>${statusLabels[r.status] || r.status}</strong></td>
                             <td>${r.expert_id || 'Не назначен'}</td>
                             <td style="color: #64748b; font-size: 12px;">${new Date(r.created_at).toLocaleString()}</td>
                             <td>
@@ -224,6 +276,28 @@
             } catch (error) {
                 console.error(error);
                 document.getElementById('reportsTableBody').innerHTML = `<tr><td colspan="8" class="empty-state" style="color: #991b1b;">Нет связи с сервером (проверьте FastAPI)</td></tr>`;
+            }
+        }
+
+        async function exportReports(format) {
+            try {
+                const response = await fetch(`http://127.0.0.1:8000/api/reports/export?format=${format}`);
+                if (!response.ok) {
+                    throw new Error('Ошибка при выгрузке отчета');
+                }
+
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = format === 'xlsx' ? 'otklik_analytics_report.xlsx' : 'otklik_analytics_report.csv';
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                window.URL.revokeObjectURL(url);
+            } catch (error) {
+                console.error(error);
+                alert('Не удалось выгрузить отчет. Проверьте соединение с сервером.');
             }
         }
 
@@ -265,7 +339,7 @@
                     container.innerHTML = messages.map(m => {
                         const isApplicant = m.sender_type === 'applicant';
                         const alignClass = isApplicant ? 'mr-auto bg-white text-slate-900 border border-slate-200' : 'ml-auto bg-sky-600 text-white';
-                        const senderTitle = isApplicant ? 'Заявитель' : 'Оператор / Эксперт';
+                        const senderTitle = isApplicant ? 'Заявитель' : 'Сотрудник / Эксперт';
                         
                         return `
                             <div class="max-w-[85%] rounded-2xl px-3 py-2 text-xs shadow-sm space-y-1 ${alignClass}">
@@ -283,7 +357,7 @@
             }
         }
 
-        async function sendOperatorMessage() {
+        async function sendStaffMessage() {
             const input = document.getElementById('chatMessageInput');
             const text = input.value.trim();
             if (!text || !currentReportId) return;
@@ -292,7 +366,6 @@
                 const response = await fetch(`http://127.0.0.1:8000/api/reports/${currentReportId}/messages`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    // Отправляем sender_type равный 'expert' (или 'operator' — в зависимости от того, что принимает бэкенд)
                     body: JSON.stringify({ message: text, sender_type: 'expert' })
                 });
 
@@ -310,7 +383,7 @@
 
         function handleChatKeyPress(e) {
             if (e.key === 'Enter') {
-                sendOperatorMessage();
+                sendStaffMessage();
             }
         }
 
@@ -318,16 +391,36 @@
             currentReportId = report.tracking_code;
             document.getElementById('modalTracking').innerText = report.tracking_code;
             document.getElementById('modalApplicant').innerText = report.applicant_type;
-            document.getElementById('modalCategory').innerText = report.category_id || 'Не указана';
-            document.getElementById('modalPriority').innerText = report.priority;
-            document.getElementById('modalExpert').innerText = report.expert_id || 'Не назначен';
+            
+            // Устанавливаем текущие значения в селекторы категории и приоритета
+            if (report.category_id) {
+                document.getElementById('modalCategorySelect').value = report.category_id;
+            }
+            if (report.priority) {
+                document.getElementById('modalPrioritySelect').value = report.priority;
+            }
+            
+            const contactEl = document.getElementById('modalContact');
+            contactEl.innerText = report.contact || report.contact_info || 'Не указан (анонимно)';
+
             document.getElementById('modalContent').innerText = report.content;
             document.getElementById('modalStatusSelect').value = report.status;
+            
+            // Рендеринг вложений
+            const attachmentsContainer = document.getElementById('modalAttachments');
+            const files = report.attachments || report.files || [];
+            if (files.length > 0) {
+                attachmentsContainer.innerHTML = files.map(file => {
+                    const fileName = typeof file === 'string' ? file : (file.name || 'Файл');
+                    return `<span class="attachment-chip">📎 ${fileName}</span>`;
+                }).join('');
+            } else {
+                attachmentsContainer.innerHTML = `<span style="color: #64748b; font-size: 13px;">Нет прикрепленных файлов</span>`;
+            }
             
             loadExperts(report.expert_id);
             loadChatMessages();
             
-            // Запускаем автообновление чата каждые 4 секунды, пока открыто окно
             if (chatInterval) clearInterval(chatInterval);
             chatInterval = setInterval(loadChatMessages, 4000);
 
@@ -340,6 +433,29 @@
             if (chatInterval) {
                 clearInterval(chatInterval);
                 chatInterval = null;
+            }
+        }
+
+        async function updateCategoryAndPriority() {
+            const category_id = document.getElementById('modalCategorySelect').value;
+            const priority = document.getElementById('modalPrioritySelect').value;
+
+            try {
+                const response = await fetch(`http://127.0.0.1:8000/api/reports/${currentReportId}/category-priority`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ category_id, priority })
+                });
+
+                if (response.ok) {
+                    alert('Категория и приоритет успешно обновлены');
+                    loadReports();
+                } else {
+                    alert('Не удалось обновить параметры');
+                }
+            } catch (error) {
+                console.error(error);
+                alert('Ошибка соединения с сервером');
             }
         }
 
@@ -383,8 +499,7 @@
                 });
 
                 if (response.ok) {
-                    alert('Эксперт успешно назначен');
-                    document.getElementById('modalExpert').innerText = expertName;
+                    alert('Эксперт успешно назначен и статус изменен на «Распределено»');
                     loadReports();
                 } else {
                     alert('Ошибка назначения эксперта');

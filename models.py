@@ -2,7 +2,9 @@ import uuid
 from datetime import datetime
 from sqlalchemy import Column, String, Text, Boolean, DateTime, ForeignKey, Enum as SQLEnum, Integer
 from sqlalchemy.orm import declarative_base, relationship
+from sqlalchemy import Column, String, Text, Boolean, DateTime, ForeignKey, Enum as SQLEnum, JSON
 import enum
+
 
 Base = declarative_base()
 
@@ -64,12 +66,15 @@ class Report(Base):
     applicant_type = Column(SQLEnum(ApplicantType), nullable=False)         # Школьник / Родитель / Педагог
     category_id = Column(String, ForeignKey("categories.id"), nullable=True) # Может быть NULL («не знаю, как назвать»)
     
-    content = Column(Text, nullable=False)                                  # Текст обращения
+    content = Column(Text, nullable=False)                                   # Текст обращения
     status = Column(SQLEnum(ReportStatus), default=ReportStatus.new, nullable=False)
     priority = Column(SQLEnum(Priority), default=Priority.standard, nullable=False)
-    is_crisis = Column(Boolean, default=False, nullable=False)              # Детекция кризисных маркеров
+    is_crisis = Column(Boolean, default=False, nullable=False)               # Детекция кризисных маркеров
     
-    contact_info = Column(String, nullable=True)                            
+    contact_info = Column(String, nullable=True) 
+    
+    # Добавляем поле для хранения списка прикрепленных файлов:
+    attachments = Column(JSON, nullable=True) # или Column(ARRAY(String), nullable=True)
     
     operator_id = Column(String, ForeignKey("users.id"), nullable=True)
     expert_id = Column(String, ForeignKey("users.id"), nullable=True)

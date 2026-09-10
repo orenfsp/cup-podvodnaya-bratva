@@ -17,6 +17,8 @@
         .btn:hover { background: #0369a1; }
         .btn-dark { background: #0f172a; }
         .btn-dark:hover { background: #1e293b; }
+        .btn-danger { background: #ef4444; }
+        .btn-danger:hover { background: #dc2626; }
         
         main { flex: 1; padding: 40px 16px; max-width: 1000px; margin: 0 auto; width: 100%; display: flex; flex-direction: column; gap: 40px; }
         .hero { text-align: center; display: flex; flex-direction: column; align-items: center; gap: 16px; }
@@ -51,6 +53,14 @@
         .form-field { display: flex; flex-direction: column; gap: 6px; }
         .form-field label { font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; }
         .alert-box { background: #fef3c7; border: 1px solid #fde68a; border-radius: 12px; padding: 12px; font-size: 12px; color: #92400e; line-height: 1.4; }
+        
+        /* Стили для блока экстренной помощи при кризисе */
+        .crisis-emergency-banner { background: #fee2e2; border: 2px solid #ef4444; border-radius: 16px; padding: 16px; display: flex; flex-direction: column; gap: 10px; animation: pulse-border 2s infinite; }
+        @keyframes pulse-border {
+            0% { border-color: #ef4444; }
+            50% { border-color: #fca5a5; }
+            100% { border-color: #ef4444; }
+        }
         
         .success-content { text-align: center; display: flex; flex-direction: column; align-items: center; gap: 16px; }
         .success-icon { width: 56px; height: 56px; background: #d1fae5; color: #059669; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 28px; font-weight: bold; }
@@ -127,10 +137,26 @@
         </div>
     </main>
 
+    <!-- Модальное окно подачи обращения -->
     <div id="reportModal" class="modal-backdrop">
         <div class="modal">
             <button class="close-btn" onclick="closeModal()">&times;</button>
             <h2 style="font-size: 20px; font-weight: 800; color: #0f172a;">Подача обращения</h2>
+
+            <!-- Динамический блок экстренной помощи (появляется сразу без блокировки ввода, если обнаружен кризис) -->
+            <div id="crisisEmergencyBanner" class="crisis-emergency-banner hidden">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="font-size: 20px;">🚨</span>
+                    <strong style="color: #991b1b; font-size: 14px;">Вам нужна срочная поддержка?</strong>
+                </div>
+                <p style="font-size: 12px; color: #7f1d1d; line-height: 1.4;">
+                    Мы заметили в вашем тексте слова, указывающие на сложную ситуацию. Пожалуйста, помните, что вы не одни, и помощь доступна прямо сейчас:
+                </p>
+                <div style="background: white; padding: 10px; border-radius: 10px; font-size: 13px; color: #1e293b; display: flex; flex-direction: column; gap: 4px;">
+                    <div>📞 <strong>Единый телефон доверия:</strong> 8-800-2000-122 (анонимно, бесплатно)</div>
+                    <div>💬 <strong>Психологическая помощь онлайн:</strong> chat.pomosh.ru</div>
+                </div>
+            </div>
 
             <div class="form-field">
                 <label>Кто вы?</label>
@@ -159,6 +185,7 @@
 
             <div class="form-field">
                 <label>Описание ситуации (свободный текст)</label>
+                <!-- Ввод НЕ блокируется! Пользователь может свободно писать и менять текст -->
                 <textarea id="reportContent" placeholder="Подробно опишите, что произошло..." oninput="autoResizeTextarea(this)"></textarea>
             </div>
 
@@ -182,6 +209,25 @@
         </div>
     </div>
 
+    <!-- Модальное окно предложения оставить способ связи (при срабатывании кризиса) -->
+    <div id="crisisContactModal" class="modal-backdrop">
+        <div class="modal">
+            <h3 style="font-size: 18px; font-weight: 800; color: #0f172a;">Связь со специалистом</h3>
+            <p style="font-size: 13px; color: #64748b; line-height: 1.4;">
+                Ваше обращение отмечено как срочное. Хотите ли вы оставить свой контакт (телефон или email), чтобы психолог или специалист службы поддержки связался с вами напрямую?
+            </p>
+            <div class="form-field">
+                <label>Ваш контакт (номер телефона или почта) — необязательно</label>
+                <input type="text" id="crisisContactInput" placeholder="+7 (999) 000-00-00 или email@example.com">
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 6px;">
+                <button class="btn" onclick="confirmCrisisContact(true)">Оставить контакт и отправить</button>
+                <button class="btn" style="background: #e2e8f0; color: #475569;" onclick="confirmCrisisContact(false)">Отказаться (продолжить анонимно)</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно успешной отправки -->
     <div id="successModal" class="modal-backdrop">
         <div class="modal success-content">
             <div class="success-icon">✓</div>
@@ -189,13 +235,20 @@
                 <h3 id="successTitle" style="font-size: 20px; font-weight: 800; color: #0f172a; margin-bottom: 6px;">Обращение успешно отправлено!</h3>
                 <p id="successText" style="font-size: 13px; color: #64748b;">Спасибо, что поделились. Ваше обращение принято и будет рассмотрено в ближайшее время.</p>
             </div>
+            
             <div class="tracking-code-block">
                 <span style="font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase;">Ваш трек-номер</span>
                 <div id="generatedTrackingCode" class="tracking-code">otk-0000-0000</div>
             </div>
+
+            <div style="width: 100%; text-align: left; display: flex; flex-direction: column; gap: 4px;">
+                <label style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase;">Прямая ссылка на диалог:</label>
+                <input type="text" id="directTrackingLink" readonly style="font-size: 12px; background: #f1f5f9; cursor: pointer;" onclick="this.select(); document.execCommand('copy'); alert('Ссылка скопирована!');">
+            </div>
             
             <div style="display: flex; flex-direction: column; gap: 8px; width: 100%;">
                 <button class="btn" style="width: 100%; padding: 12px; background: #0284c7;" onclick="goToChatFromSuccess()">💬 Перейти в безопасный чат</button>
+                <button class="btn" style="width: 100%; padding: 12px; background: #0ea5e9;" onclick="alert('Нажмите Ctrl+D (или Cmd+D на Mac), чтобы сохранить эту страницу в закладки вашего браузера.');">⭐ Добавить в закладки (Ctrl+D)</button>
                 <button class="btn" style="width: 100%; padding: 12px; background: #e2e8f0; color: #475569;" onclick="closeSuccessModal()">Вернуться на главную</button>
             </div>
         </div>
@@ -203,9 +256,12 @@
 
     <script>
         let attachedFiles = [];
+        let createdTrackingCode = null; // Глобально храним tracking_code текущего обращения
+        let windowCurrentContent = ''; // Глобально храним текст обращения
 
         function openModal() { 
             document.getElementById('reportModal').style.display = 'flex'; 
+            document.getElementById('crisisEmergencyBanner').classList.add('hidden');
             updateDynamicQuestions();
         }
         function closeModal() { document.getElementById('reportModal').style.display = 'none'; }
@@ -228,24 +284,24 @@
             let html = '';
             if (category === '1') {
                 html = `
-                    <label style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase;">Уточняющие вопросы:</label>
+                    <label style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase;">Уточняющие вопросы (обязательно):</label>
                     <input type="text" id="q1" placeholder="Кто вовлечен в ситуацию? (имена, классы/группы)">
                     <input type="text" id="q2" placeholder="Как часто это повторяется?">
                 `;
             } else if (category === '2') {
                 html = `
-                    <label style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase;">Уточняющие вопросы:</label>
+                    <label style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase;">Уточняющие вопросы (обязательно):</label>
                     <input type="text" id="q1" placeholder="Какой предмет или какое расписание затронуто?">
                     <input type="text" id="q2" placeholder="К какому преподавателю или сотруднику относится вопрос?">
                 `;
             } else if (category === '3') {
                 html = `
-                    <label style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase;">Уточняющие вопросы:</label>
+                    <label style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase;">Уточняющие вопросы (обязательно):</label>
                     <input type="text" id="q1" placeholder="Где именно возникла проблема (кабинет, платформа, сайт)?">
                 `;
             } else {
                 html = `
-                    <label style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase;">Уточняющие вопросы:</label>
+                    <label style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase;">Уточняющие вопросы (обязательно):</label>
                     <input type="text" id="q1" placeholder="Опишите в нескольких словах, к какой сфере относится проблема?">
                 `;
             }
@@ -255,13 +311,11 @@
         function handleFileSelect(event) {
             const files = Array.from(event.target.files);
             files.forEach(file => {
-                // Избегаем дубликатов по имени и размеру
                 if (!attachedFiles.some(f => f.name === file.name && f.size === file.size)) {
                     attachedFiles.push(file);
                 }
             });
             renderFileList();
-            // Сбрасываем значение input, чтобы можно было выбрать тот же файл повторно при необходимости
             event.target.value = '';
         }
 
@@ -289,43 +343,80 @@
             container.innerHTML = html;
         }
 
+        function saveLocalTracking(trackingCode) {
+            let history = JSON.parse(localStorage.getItem('otklik_codes') || '[]');
+            if (!history.includes(trackingCode)) {
+                history.unshift(trackingCode);
+                localStorage.setItem('otklik_codes', JSON.stringify(history));
+            }
+        }
+
         async function submitReport() {
             const applicant_type = document.getElementById('applicantType').value;
             const category_id = String(document.getElementById('categorySelect').value);
             const content = document.getElementById('reportContent').value;
             
-            const q1 = document.getElementById('q1') ? document.getElementById('q1').value : '';
-            const q2 = document.getElementById('q2') ? document.getElementById('q2').value : '';
+            const q1Input = document.getElementById('q1');
+            const q2Input = document.getElementById('q2');
+            
+            const q1 = q1Input ? q1Input.value.trim() : '';
+            const q2 = q2Input ? q2Input.value.trim() : '';
+
+            // Валидация обязательности ответов на уточняющие вопросы
+            if (q1Input && !q1) {
+                alert('Пожалуйста, ответьте на первый уточняющий вопрос');
+                q1Input.focus();
+                return;
+            }
+            if (q2Input && !q2) {
+                alert('Пожалуйста, ответьте на второй уточняющий вопрос');
+                q2Input.focus();
+                return;
+            }
+
+            if (!content.trim()) { 
+                alert('Пожалуйста, опишите ситуацию'); 
+                document.getElementById('reportContent').focus();
+                return; 
+            }
 
             let fullContent = content;
             if (q1 || q2) {
-                fullContent = `Уточнения:\n- ${q1}\n- ${q2}\n\nОписание:\n${content}`;
+                let questionsBlock = "Уточнения:\n";
+                if (q1) questionsBlock += `- ${q1}\n`;
+                if (q2) questionsBlock += `- ${q2}\n`;
+                fullContent = `${questionsBlock}\nОписание:\n${content}`;
             }
 
-            if (!content.trim()) { alert('Пожалуйста, опишите ситуацию'); return; }
-
             const attachmentNames = attachedFiles.map(f => f.name);
+            windowCurrentContent = fullContent; // Сохраняем базовый текст
+
+            const contactInputVal = document.getElementById('crisisContactInput') ? document.getElementById('crisisContactInput').value.trim() : null;
 
             try {
                 const response = await fetch('http://localhost:8000/api/reports', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ applicant_type, category_id, content: fullContent, attachments: attachmentNames })
+                    body: JSON.stringify({ 
+                        applicant_type, 
+                        category_id, 
+                        content: fullContent, 
+                        contact_info: contactInputVal || null, 
+                        attachments: attachmentNames 
+                    })
                 });
 
                 if (response.ok) {
                     const data = await response.json();
-                    document.getElementById('generatedTrackingCode').innerText = data.tracking_code;
-
-                    const successTextEl = document.getElementById('successText');
-                    if (applicant_type === 'schoolkid') {
-                        successTextEl.innerText = "Спасибо, что поделился. Твое обращение принято и будет рассмотрено в ближайшее время.";
-                    } else {
-                        successTextEl.innerText = "Спасибо, что поделились. Ваше обращение принято и будет рассмотрено в ближайшее время.";
+                    createdTrackingCode = data.tracking_code; // Сохраняем созданный трек-код
+                    
+                    if (data.is_crisis) {
+                        document.getElementById('crisisEmergencyBanner').classList.remove('hidden');
+                        document.getElementById('crisisContactModal').style.display = 'flex';
+                        return;
                     }
 
-                    closeModal();
-                    document.getElementById('successModal').style.display = 'flex';
+                    finalizeSuccess(data.tracking_code, applicant_type);
                 } else {
                     const errData = await response.json().catch(() => ({}));
                     console.error('Validation error:', errData);
@@ -333,8 +424,65 @@
                 }
             } catch (error) {
                 console.error(error);
-                alert('Не удалось подключиться к серверу бэкенда (убедитесь, что Docker запущен)');
+                alert('Не удалось подключиться к серверу бэкенда (убедитесь, что сервер запущен)');
             }
+        }
+
+        // Обработка выбора варианта связи при кризисной ситуации (оставить или отказаться)
+        async function confirmCrisisContact(wantToLeaveContact) {
+            const contactInput = document.getElementById('crisisContactInput').value.trim();
+            if (wantToLeaveContact && !contactInput) {
+                alert('Пожалуйста, введите контактные данные или выберите вариант «Отказаться»');
+                return;
+            }
+
+            let finalContent = windowCurrentContent;
+            if (wantToLeaveContact && contactInput) {
+                finalContent += `\n\n--- Контакт для связи, оставленный заявителем: ${contactInput} ---`;
+            }
+
+            document.getElementById('crisisContactModal').style.display = 'none';
+            const applicant_type = document.getElementById('applicantType').value;
+
+            // Если обращение уже было создано, обновляем текст и контакт в существующей записи через PATCH
+            if (createdTrackingCode) {
+                try {
+                    const response = await fetch(`http://localhost:8000/api/reports/${createdTrackingCode}/content`, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ 
+                            content: finalContent,
+                            contact_info: wantToLeaveContact ? contactInput : null 
+                        })
+                    });
+
+                    if (response.ok) {
+                        finalizeSuccess(createdTrackingCode, applicant_type);
+                        return;
+                    }
+                } catch (err) {
+                    console.error('Ошибка при обновлении контакта:', err);
+                }
+            }
+
+            // Запасной вариант (если эндпоинт обновления не предусмотрен)
+            finalizeSuccess(createdTrackingCode || 'otk-saved', applicant_type);
+        }
+
+        function finalizeSuccess(tCode, applicant_type) {
+            document.getElementById('generatedTrackingCode').innerText = tCode;
+            document.getElementById('directTrackingLink').value = window.location.origin + `/chat.html?tracking=${tCode}`;
+            saveLocalTracking(tCode);
+
+            const successTextEl = document.getElementById('successText');
+            if (applicant_type === 'schoolkid') {
+                successTextEl.innerText = "Спасибо, что поделился. Твое обращение принято и будет рассмотрено в ближайшее время.";
+            } else {
+                successTextEl.innerText = "Спасибо, что поделились. Ваше обращение принято и будет рассмотрено в ближайшее время.";
+            }
+
+            closeModal();
+            document.getElementById('successModal').style.display = 'flex';
         }
 
         async function checkStatus() {
@@ -371,14 +519,15 @@
                 alert('Ошибка соединения с сервером');
             }
         }
+
         function goToChatFromSuccess() {
-    const code = document.getElementById('generatedTrackingCode').innerText.trim();
-    if (code && code !== 'otk-0000-0000') {
-        window.location.href = `chat.html?tracking=${code}`;
-    } else {
-        alert('Трек-номер еще не сгенерирован или пустой');
-    }
-}
+            const code = document.getElementById('generatedTrackingCode').innerText.trim();
+            if (code && code !== 'otk-0000-0000') {
+                window.location.href = `chat.html?tracking=${code}`;
+            } else {
+                alert('Трек-номер еще не сгенерирован или пустой');
+            }
+        }
     </script>
 </body>
 </html>

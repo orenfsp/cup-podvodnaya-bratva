@@ -1,13 +1,17 @@
 import os
 import re
+import csv
+import io
 from datetime import datetime
 from typing import List, Optional
 from fastapi import FastAPI, Depends, HTTPException, status, Request, Response
+from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session, sessionmaker
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, text, func
 from sqlalchemy.exc import IntegrityError
 from pydantic import BaseModel
+import openpyxl
 
 import pymorphy3
 from thefuzz import fuzz
@@ -130,46 +134,146 @@ def login_user(payload: LoginRequest, db: Session = Depends(get_db)):
 
 @app.post("/api/reports", response_model=dict, status_code=status.HTTP_201_CREATED)
 def create_report(report_data: ReportCreate, db: Session = Depends(get_db)):
-    tracking_code = generate_tracking_code()
-    while db.query(Report).filter(Report.tracking_code == tracking_code).first():
+    try:
         tracking_code = generate_tracking_code()
+        while db.query(Report).filter(Report.tracking_code == tracking_code).first():
+            tracking_code = generate_tracking_code()
 
-    is_crisis_detected = detect_crisis(report_data.content)
-    priority = Priority.urgent if is_crisis_detected else Priority.standard
+        is_crisis_detected = detect_crisis(report_data.content)
+        priority = Priority.urgent if is_crisis_detected else Priority.standard
 
-    safe_attachments = strip_exif_and_save(report_data.attachments)
+        safe_attachments = strip_exif_and_save(report_data.attachments)
 
-    contact_info_val = getattr(report_data, 'contact_info', None)
+        assigned_expert = None
+        rule = db.query(RoutingRule).filter(RoutingRule.category_id == str(report_data.category_id)).first()
+        if rule:
+            assigned_expert = rule.expert_id
 
-    assigned_expert = None
-    rule = db.query(RoutingRule).filter(RoutingRule.category_id == str(report_data.category_id)).first()
-    if rule:
-        assigned_expert = rule.expert_id
+        new_report = Report(
+            tracking_code=tracking_code,
+            applicant_type=report_data.applicant_type,
+            category_id=str(report_data.category_id),
+            content=report_data.content,
+            status=ReportStatus.new,
+            priority=priority,
+            is_crisis=is_crisis_detected,
+            contact_info=report_data.contact_info,
+            expert_id=assigned_expert,
+            attachments=safe_attachments
+        )
 
-    new_report = Report(
-        tracking_code=tracking_code,
-        applicant_type=report_data.applicant_type,
-        category_id=report_data.category_id,
-        content=report_data.content,
-        status=ReportStatus.new,
-        priority=priority,
-        is_crisis=is_crisis_detected,
-        contact_info=contact_info_val if is_crisis_detected else None,
-        expert_id=assigned_expert
-    )
+        db.add(new_report)
+        db.commit()
+        db.refresh(new_report)
 
-    db.add(new_report)
-    db.commit()
-    db.refresh(new_report)
+        return {
+            "message": "Обращение успешно создано",
+            "tracking_code": tracking_code,
+            "is_crisis": is_crisis_detected,
+            "emergency_help_shown": is_crisis_detected,
+            "status": new_report.status.value if hasattr(new_report.status, 'value') else new_report.status,
+            "expert_id": new_report.expert_id,
+            "attachments": new_report.attachments
+        }
+    except Exception as e:
+        db.rollback()
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/reports/analytics")
+def get_analytics(db: Session = Depends(get_db)):
+    total = db.query(Report).count()
+    
+    active = db.query(Report).filter(Report.status.in_([ReportStatus.new, ReportStatus.in_progress])).count()
+    resolved = db.query(Report).filter(Report.status.in_([ReportStatus.ready, ReportStatus.completed])).count()
+    critical = db.query(Report).filter(Report.is_crisis == True).count()
+
+    categories_raw = db.query(Category.name, func.count(Report.id)).outerjoin(Report, Category.id == Report.category_id).group_by(Category.name).all()
+    categories_dict = {name: count for name, count in categories_raw if name}
+
+    applicant_types_raw = db.query(Report.applicant_type, func.count(Report.id)).group_by(Report.applicant_type).all()
+    
+    type_labels = {
+        "schoolkid": "Студент / Ученик",
+        "teacher": "Преподаватель / Сотрудник",
+        "parent": "Родитель"
+    }
+    
+    applicants_dict = {}
+    for app_type, count in applicant_types_raw:
+        label = type_labels.get(app_type, app_type or "Не указано")
+        applicants_dict[label] = count
 
     return {
-        "message": "Обращение успешно создано",
-        "tracking_code": tracking_code,
-        "is_crisis": is_crisis_detected,
-        "emergency_help_shown": is_crisis_detected,
-        "status": new_report.status.value if hasattr(new_report.status, 'value') else new_report.status,
-        "expert_id": new_report.expert_id
+        "total": total,
+        "active": active,
+        "resolved": resolved,
+        "critical": critical,
+        "categories": categories_dict,
+        "applicant_types": applicants_dict
     }
+
+
+@app.get("/api/reports/export")
+def export_reports(format: str = "csv", db: Session = Depends(get_db)):
+    total = db.query(Report).count()
+    active = db.query(Report).filter(Report.status.in_([ReportStatus.new, ReportStatus.in_progress])).count()
+    resolved = db.query(Report).filter(Report.status.in_([ReportStatus.ready, ReportStatus.completed])).count()
+    critical = db.query(Report).filter(Report.is_crisis == True).count()
+
+    rows = [
+        ["Метрика / Категория", "Значение"],
+        ["Всего обращений", str(total)],
+        ["В работе / Новые", str(active)],
+        ["Решено", str(resolved)],
+        ["Срочные (Высокий риск)", str(critical)]
+    ]
+
+    categories_raw = db.query(Category.name, func.count(Report.id)).outerjoin(Report, Category.id == Report.category_id).group_by(Category.name).all()
+    for name, count in categories_raw:
+        if name:
+            rows.append([f"Категория: {name}", str(count)])
+
+    applicant_types_raw = db.query(Report.applicant_type, func.count(Report.id)).group_by(Report.applicant_type).all()
+    type_labels = {
+        "schoolkid": "Студент / Ученик",
+        "teacher": "Преподаватель / Сотрудник",
+        "parent": "Родитель"
+    }
+    for app_type, count in applicant_types_raw:
+        label = type_labels.get(app_type, app_type or "Не указано")
+        rows.append([f"Тип заявителя: {label}", str(count)])
+
+    if format.lower() == "xlsx":
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "Аналитика Отклик"
+        
+        for row in rows:
+            ws.append(row)
+            
+        output = io.BytesIO()
+        wb.save(output)
+        output.seek(0)
+        
+        return StreamingResponse(
+            output,
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": "attachment; filename=otklik_analytics_report.xlsx"}
+        )
+    else:
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerows(rows)
+        
+        output.seek(0)
+        return StreamingResponse(
+            iter([output.getvalue()]),
+            media_type="text/csv",
+            headers={"Content-Disposition": "attachment; filename=otklik_analytics_report.csv"}
+        )
+
 
 @app.get("/api/reports")
 def get_reports(expert_id: Optional[str] = None, status: Optional[str] = None, db: Session = Depends(get_db)):
@@ -211,6 +315,8 @@ def get_reports(expert_id: Optional[str] = None, status: Optional[str] = None, d
             "priority": r.priority.value if hasattr(r.priority, 'value') else r.priority,
             "is_crisis": r.is_crisis,
             "expert_id": getattr(r, "expert_id", None),
+            "contact": getattr(r, "contact_info", getattr(r, "contact", None)),
+            "attachments": getattr(r, "attachments", []),
             "created_at": r.created_at.isoformat()
         }
         for r in reports
@@ -236,6 +342,8 @@ def get_operator_reports(db: Session = Depends(get_db)):
             "priority": r.priority.value if hasattr(r.priority, 'value') else r.priority,
             "is_crisis": r.is_crisis,
             "expert_id": getattr(r, "expert_id", None),
+            "contact": getattr(r, "contact_info", getattr(r, "contact", None)),
+            "attachments": getattr(r, "attachments", []),
             "created_at": r.created_at.isoformat()
         }
         for r in reports
@@ -277,6 +385,9 @@ def assign_expert(report_id: str, payload: AssignExpertRequest, db: Session = De
                 expert_val = user_by_name.id
 
         report.expert_id = expert_val
+        
+        # Автоматически переводим статус в «Распределено» / «В работе» при назначении эксперта
+        report.status = ReportStatus.in_progress 
 
         db.commit()
         
@@ -285,7 +396,7 @@ def assign_expert(report_id: str, payload: AssignExpertRequest, db: Session = De
                 action="MANUAL_EXPERT_ASSIGN",
                 target_report_id=report.tracking_code,
                 reason=payload.reason,
-                details=f"Эксперт изменен с '{old_expert}' на '{payload.expert_name}'"
+                details=f"Эксперт изменен с '{old_expert}' на '{payload.expert_name}' и статус изменен на 'Распределено'"
             )
             db.add(audit)
             db.commit()
@@ -294,7 +405,59 @@ def assign_expert(report_id: str, payload: AssignExpertRequest, db: Session = De
 
         db.refresh(report)
         
-        return {"message": "Эксперт успешно назначен", "expert_id": report.expert_id}
+        return {
+            "message": "Эксперт успешно назначен", 
+            "expert_id": report.expert_id,
+            "status": report.status.value if hasattr(report.status, 'value') else report.status
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class UpdateCategoryPriorityRequest(BaseModel):
+    category_id: Optional[str] = None
+    priority: Optional[str] = None
+
+@app.patch("/api/reports/{report_id}/category-priority")
+def update_report_category_priority(report_id: str, payload: UpdateCategoryPriorityRequest, db: Session = Depends(get_db)):
+    try:
+        report = None
+        try:
+            int_id = int(report_id)
+            report = db.query(Report).filter(Report.id == int_id).first()
+        except ValueError:
+            report = db.query(Report).filter(Report.tracking_code == report_id).first()
+
+        if not report:
+            raise HTTPException(status_code=404, detail="Обращение не найдено")
+        
+        if payload.category_id is not None:
+            report.category_id = payload.category_id
+            
+        if payload.priority is not None:
+            priority_map = {
+                "standard": Priority.standard,
+                "стандартный": Priority.standard,
+                "urgent": Priority.urgent,
+                "срочный": Priority.urgent,
+                "high": Priority.urgent
+            }
+            clean_priority = str(payload.priority).strip().lower()
+            report.priority = priority_map.get(clean_priority, Priority.standard)
+
+        db.commit()
+        db.refresh(report)
+        
+        return {
+            "message": "Категория и приоритет успешно обновлены",
+            "category_id": report.category_id,
+            "priority": report.priority.value if hasattr(report.priority, 'value') else report.priority
+        }
     except HTTPException:
         raise
     except Exception as e:
@@ -310,7 +473,7 @@ def check_report_status(payload: StatusCheckRequest, db: Session = Depends(get_d
     report = db.query(Report).filter(Report.tracking_code == clean_code).first()
     
     if not report:
-        report = db.query(Report).filter(db.func.lower(Report.tracking_code) == clean_code.lower()).first()
+        report = db.query(Report).filter(func.lower(Report.tracking_code) == clean_code.lower()).first()
 
     if not report:
         raise HTTPException(
@@ -326,6 +489,8 @@ def check_report_status(payload: StatusCheckRequest, db: Session = Depends(get_d
         "status": report.status.value if hasattr(report.status, 'value') else report.status,
         "priority": report.priority.value if hasattr(report.priority, 'value') else report.priority,
         "is_crisis": report.is_crisis,
+        "contact": getattr(report, "contact_info", getattr(report, "contact", None)),
+        "attachments": getattr(report, "attachments", []),
         "created_at": report.created_at.isoformat()
     }
 
