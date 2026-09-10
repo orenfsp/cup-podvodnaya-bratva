@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Платформа «Отклик» — Проверка статуса обращения</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+        body { background-color: #f8f9fa; color: #1e293b; min-height: 100vh; display: flex; flex-direction: column; }
+        header { background: #ffffff; border-bottom: 1px solid #e2e8f0; position: sticky; top: 0; z-index: 40; }
+        .container { max-width: 800px; margin: 0 auto; padding: 0 20px; width: 100%; }
+        .header-content { height: 70px; display: flex; align-items: center; justify-content: space-between; }
+        .logo-box { display: flex; align-items: center; gap: 12px; }
+        .logo-icon { width: 40px; height: 40px; background: #0284c7; color: white; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 18px; }
+        .logo-text { font-size: 20px; font-weight: 800; color: #0f172a; }
+        
+        main { flex: 1; padding: 40px 20px; max-width: 800px; margin: 0 auto; width: 100%; display: flex; flex-direction: column; gap: 24px; }
+        
+        .search-card { background: white; border: 1px solid #e2e8f0; border-radius: 20px; padding: 30px; display: flex; flex-direction: column; gap: 16px; }
+        .search-title { font-size: 20px; font-weight: 800; color: #0f172a; }
+        .search-desc { font-size: 14px; color: #64748b; line-height: 1.5; }
+        .search-row { display: flex; gap: 12px; }
+        
+        input { background: #fff; border: 1px solid #cbd5e1; border-radius: 12px; padding: 12px 16px; font-size: 15px; outline: none; flex: 1; font-family: monospace; }
+        
+        .btn { background: #0284c7; color: white; border: none; padding: 12px 24px; border-radius: 12px; font-weight: 600; font-size: 14px; cursor: pointer; transition: background 0.2s; text-align: center; }
+        .btn:hover { background: #0369a1; }
+        .btn-secondary { background: #f1f5f9; color: #475569; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; }
+        .btn-secondary:hover { background: #e2e8f0; }
+
+        .result-card { background: white; border: 1px solid #e2e8f0; border-radius: 20px; padding: 30px; display: none; flex-direction: column; gap: 20px; }
+        .status-badge { display: inline-block; padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 700; width: fit-content; }
+        
+        .chat-container { border: 1px solid #e2e8f0; border-radius: 16px; height: 350px; display: flex; flex-direction: column; background: #fafafa; overflow: hidden; }
+        .chat-messages { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
+        .message { max-width: 80%; padding: 12px 16px; border-radius: 14px; font-size: 14px; line-height: 1.4; }
+        .message.applicant { background: #0284c7; color: white; align-self: flex-end; }
+        .message.expert { background: white; border: 1px solid #e2e8f0; align-self: flex-start; color: #1e293b; }
+        .chat-input-box { padding: 12px; background: white; border-top: 1px solid #e2e8f0; display: flex; gap: 10px; }
+        .chat-input-box input { font-family: inherit; font-size: 14px; padding: 10px 14px; }
+
+        .error-msg { color: #991b1b; font-size: 14px; font-weight: 600; display: none; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="container header-content">
+            <div class="logo-box">
+                <div class="logo-icon">🛡️</div>
+                <div class="logo-text">Отклик</div>
+            </div>
+            <a href="index.html" class="btn btn-secondary" style="padding: 8px 16px; font-size: 13px;">На главную</a>
+        </div>
+    </header>
+
+    <main>
+        <div class="search-card">
+            <div class="search-title">Проверка статуса обращения</div>
+            <div class="search-desc">Введите ваш уникальный трек-номер, чтобы узнать, что происходит с обращением, и прочитать ответ специалиста.</div>
+            <div class="search-row">
+                <input type="text" id="trackInput" placeholder="ОТК-XXXX-XXXX" onkeydown="if(event.key==='Enter') checkStatus()">
+                <button class="btn" onclick="checkStatus()">Проверить</button>
+            </div>
+            <div id="errorMsg" class="error-msg">Обращение с таким трек-номером не найдено. Проверьте правильность ввода.</div>
+        </div>
+
+        <div id="resultCard" class="result-card">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <div style="font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: 700;">Трек-номер</div>
+                    <div id="resCode" style="font-family: monospace; font-size: 18px; font-weight: 800; color: #0f172a;"></div>
+                </div>
+                <div id="resStatusBadge" class="status-badge"></div>
+            </div>
+
+            <div>
+                <div style="font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: 700; margin-bottom: 6px;">Ваше исходное обращение</div>
+                <div id="resContent" style="background: #f8f9fa; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px; font-size: 14px; line-height: 1.4; color: #1e293b;"></div>
+            </div>
+
+            <div>
+                <div style="font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: 700; margin-bottom: 8px;">Диалог со специалистом</div>
+                <div class="chat-container">
+                    <div class="chat-messages" id="chatMessagesBox"></div>
+                    <div class="chat-input-box">
+                        <input type="text" id="applicantMessageInput" placeholder="Написать сообщение специалисту..." onkeydown="if(event.key==='Enter') sendApplicantMessage()">
+                        <button class="btn" style="padding: 10px 16px;" onclick="sendApplicantMessage()">Отправить</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        let currentReport = null;
+
+        function checkStatus() {
+            const code = document.getElementById('trackInput').value.trim().toUpperCase();
+            const errorMsg = document.getElementById('errorMsg');
+            const resultCard = document.getElementById('resultCard');
+
+            if (!code) return;
+
+            const reports = JSON.parse(localStorage.getItem('otklik_reports') || '[]');
+            const found = reports.find(r => r.tracking_code.toUpperCase() === code);
+
+            if (!found) {
+                errorMsg.style.display = 'block';
+                resultCard.style.display = 'none';
+                currentReport = null;
+                return;
+            }
+
+            errorMsg.style.display = 'none';
+            currentReport = found;
+            renderResult();
+            resultCard.style.display = 'flex';
+        }
+
+        function renderResult() {
+            if (!currentReport) return;
+
+            document.getElementById('resCode').innerText = currentReport.tracking_code;
+            document.getElementById('resContent').innerText = currentReport.content || 'Нет текста';
+
+            const badge = document.getElementById('resStatusBadge');
+            const statuses = {
+                'new': { text: 'Получено, ждёт оператора', bg: '#fef3c7', color: '#92400e' },
+                'assigned': { text: 'Передано специалисту', bg: '#e0f2fe', color: '#0369a1' },
+                'in_progress': { text: 'Специалист разбирается в ситуации', bg: '#e0f2fe', color: '#0369a1' },
+                'needs_info': { text: 'Нужно уточнение', bg: '#fef3c7', color: '#92400e' },
+                'ready': { text: 'Ответ готов', bg: '#dcfce7', color: '#166534' },
+                'completed': { text: 'Завершено', bg: '#dcfce7', color: '#166534' }
+            };
+
+            const st = statuses[currentReport.status] || { text: currentReport.status, bg: '#f1f5f9', color: '#475569' };
+            badge.innerText = st.text;
+            badge.style.backgroundColor = st.bg;
+            badge.style.color = st.color;
+
+            renderChat();
+        }
+
+        function renderChat() {
+            const chatBox = document.getElementById('chatMessagesBox');
+            const messages = currentReport.messages || [];
+
+            if (messages.length === 0) {
+                chatBox.innerHTML = `<div style="text-align: center; color: #64748b; font-size: 13px;">Сообщений пока нет. Специалист ответит вам здесь.</div>`;
+                return;
+            }
+
+            chatBox.innerHTML = messages.map(m => `
+                <div class="message ${m.sender_type === 'expert' ? 'expert' : 'applicant'}">
+                    <div style="font-size: 10px; opacity: 0.8; margin-bottom: 2px;">${m.sender_type === 'expert' ? 'Специалист' : 'Вы'}</div>
+                    <div>${m.message}</div>
+                </div>
+            `).join('');
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        function sendApplicantMessage() {
+            if (!currentReport) return;
+            const input = document.getElementById('applicantMessageInput');
+            const text = input.value.trim();
+            if (!text) return;
+
+            if (!currentReport.messages) {
+                currentReport.messages = [];
+            }
+
+            currentReport.messages.push({
+                sender_type: 'applicant',
+                message: text
+            });
+
+            // Сохраняем в localStorage и обновляем общую базу обращений
+            let reports = JSON.parse(localStorage.getItem('otklik_reports') || '[]');
+            const index = reports.findIndex(r => r.tracking_code === currentReport.tracking_code);
+            if (index !== -1) {
+                reports[index] = currentReport;
+                localStorage.setItem('otklik_reports', JSON.stringify(reports));
+            }
+
+            input.value = '';
+            renderChat();
+        }
+
+        setInterval(() => {
+            if (currentReport) {
+                const reports = JSON.parse(localStorage.getItem('otklik_reports') || '[]');
+                const found = reports.find(r => r.tracking_code === currentReport.tracking_code);
+                if (found) {
+                    currentReport = found;
+                    renderResult();
+                }
+            }
+        }, 3000);
+    </script>
+</body>
+</html>

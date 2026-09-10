@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Платформа «Отклик» — Панель модератора</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+        body { background-color: #f8f9fa; color: #1e293b; min-height: 100vh; display: flex; flex-direction: column; }
+        header { background: #ffffff; border-bottom: 1px solid #e2e8f0; position: sticky; top: 0; z-index: 40; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 0 20px; width: 100%; }
+        .header-content { height: 70px; display: flex; align-items: center; justify-content: space-between; }
+        .logo-box { display: flex; align-items: center; gap: 12px; }
+        .logo-icon { width: 40px; height: 40px; background: #0f172a; color: white; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 18px; }
+        .logo-text { font-size: 20px; font-weight: 800; color: #0f172a; }
+        
+        main { flex: 1; padding: 40px 20px; max-width: 1200px; margin: 0 auto; width: 100%; display: flex; flex-direction: column; gap: 24px; }
+        .dashboard-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; }
+        h1 { font-size: 28px; font-weight: 800; color: #0f172a; }
+        
+        .filters { display: flex; gap: 12px; flex-wrap: wrap; }
+        select, input { background: #fff; border: 1px solid #cbd5e1; border-radius: 12px; padding: 10px 14px; font-size: 14px; outline: none; width: 100%; }
+        
+        .table-card { background: white; border: 1px solid #e2e8f0; border-radius: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.02); overflow: hidden; }
+        table { width: 100%; border-collapse: collapse; text-align: left; font-size: 14px; }
+        th { background: #f8f9fa; color: #64748b; font-weight: 700; text-transform: uppercase; font-size: 11px; padding: 16px; border-bottom: 1px solid #e2e8f0; }
+        td { padding: 16px; border-bottom: 1px solid #e2e8f0; color: #1e293b; vertical-align: middle; }
+        tr:last-child td { border-bottom: none; }
+        
+        .badge { display: inline-block; padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; text-transform: uppercase; }
+        .badge-danger { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
+        .badge-warning { background: #fffbeb; color: #92400e; border: 1px solid #fde68a; }
+        .badge-info { background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; }
+        
+        .btn { background: #0284c7; color: white; border: none; padding: 8px 14px; border-radius: 10px; font-weight: 600; font-size: 13px; cursor: pointer; transition: background 0.2s; text-decoration: none; display: inline-block; }
+        .btn:hover { background: #0369a1; }
+        .btn-secondary { background: #f1f5f9; color: #475569; }
+        .btn-secondary:hover { background: #e2e8f0; }
+        .btn-admin { background: #4f46e5; }
+        .btn-admin:hover { background: #4338ca; }
+
+        .modal-backdrop { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px); display: none; align-items: center; justify-content: center; z-index: 100; padding: 20px; }
+        .modal { background: white; border-radius: 24px; width: 100%; max-width: 600px; padding: 32px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); display: flex; flex-direction: column; gap: 20px; position: relative; max-height: 90vh; overflow-y: auto; }
+        .close-btn { position: absolute; top: 20px; right: 20px; background: none; border: none; font-size: 24px; color: #94a3b8; cursor: pointer; }
+        .close-btn:hover { color: #0f172a; }
+        
+        .empty-state { text-align: center; padding: 40px; color: #64748b; font-size: 14px; }
+    </style>
+</head>
+<body onload="loadReports()">
+
+    <header>
+        <div class="container header-content">
+            <div class="logo-box">
+                <div class="logo-icon">🛡️</div>
+                <div class="logo-text">Панель модератора</div>
+            </div>
+            <div style="display: flex; gap: 10px; align-items: center;">
+                <button class="btn btn-admin" onclick="requestAdminAccess()">Перейти в админку</button>
+                <a href="index.html" class="btn btn-secondary">Выйти</a>
+            </div>
+        </div>
+    </header>
+
+    <main>
+        <div class="dashboard-header">
+            <h1>Поступившие обращения</h1>
+            <div class="filters">
+                <select id="statusFilter" onchange="loadReports()">
+                    <option value="">Все статусы</option>
+                    <option value="new">Новое</option>
+                    <option value="in_progress">В работе</option>
+                    <option value="resolved">Решено</option>
+                    <option value="completed">Завершено</option>
+                    <option value="rejected">Отклонено</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="table-card">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Трек-номер</th>
+                        <th>Тип заявителя</th>
+                        <th>Категория</th>
+                        <th>Приоритет</th>
+                        <th>Статус</th>
+                        <th>Эксперт</th>
+                        <th>Дата</th>
+                        <th>Действие</th>
+                    </tr>
+                </thead>
+                <tbody id="reportsTableBody">
+                    <tr>
+                        <td colspan="8" class="empty-state">Загрузка обращений...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </main>
+
+    <!-- Модальное окно деталей обращения -->
+    <div id="reportModal" class="modal-backdrop">
+        <div class="modal">
+            <button class="close-btn" onclick="closeModal()">&times;</button>
+            <h2 style="font-size: 22px; font-weight: 800; color: #0f172a;">Детали обращения</h2>
+            
+            <div style="display: flex; flex-direction: column; gap: 14px; font-size: 14px;">
+                <div><strong>Трек-номер:</strong> <span id="modalTracking" style="font-family: monospace; color: #0284c7;"></span></div>
+                <div><strong>Заявитель:</strong> <span id="modalApplicant"></span></div>
+                <div><strong>Категория:</strong> <span id="modalCategory"></span></div>
+                <div><strong>Приоритет:</strong> <span id="modalPriority"></span></div>
+                <div><strong>Эксперт:</strong> <span id="modalExpert"></span></div>
+                <div><strong>Текст обращения:</strong></div>
+                <div id="modalContent" style="background: #f8f9fa; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; color: #1e293b; line-height: 1.5; white-space: pre-wrap; word-break: break-word; overflow-wrap: break-word;"></div>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+                <label style="font-size: 12px; font-weight: 700; color: #64748b; text-transform: uppercase;">Назначить эксперта</label>
+                <div style="display: flex; gap: 8px;">
+                    <!-- Заменили input на select -->
+                    <select id="expertSelect" style="flex: 1;">
+                        <option value="">Загрузка экспертов...</option>
+                    </select>
+                    <button class="btn btn-secondary" onclick="assignExpertFromModal()">Назначить</button>
+                </div>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+                <label style="font-size: 12px; font-weight: 700; color: #64748b; text-transform: uppercase;">Изменить статус</label>
+                <select id="modalStatusSelect">
+                    <option value="new">Новое</option>
+                    <option value="in_progress">В работе</option>
+                    <option value="resolved">Решено</option>
+                    <option value="completed">Завершено</option>
+                    <option value="rejected">Отклонено</option>
+                </select>
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 10px;">
+                <button class="btn btn-secondary" onclick="closeModal()">Закрыть</button>
+                <button class="btn" onclick="updateReportStatus()">Сохранить</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="adminPinModal" class="modal-backdrop">
+        <div class="modal" style="max-width: 400px;">
+            <button class="close-btn" onclick="closeAdminModal()">&times;</button>
+            <h2 style="font-size: 20px; font-weight: 800; color: #0f172a;">Доступ в админку</h2>
+            <p style="font-size: 14px; color: #64748b;">Введите секретный код доступа для перехода к панели управления:</p>
+            <input type="password" id="adminPinInput" placeholder="Введите код доступа" style="font-size: 16px; text-align: center; letter-spacing: 2px;" onkeydown="if(event.key === 'Enter') verifyAdminPin()">
+            <div id="pinError" style="font-size: 13px; color: #991b1b; display: none;">Неверный код доступа</div>
+            <div style="display: flex; gap: 10px; margin-top: 10px;">
+                <button class="btn btn-secondary" style="flex: 1;" onclick="closeAdminModal()">Отмена</button>
+                <button class="btn btn-admin" style="flex: 1;" onclick="verifyAdminPin()">Войти</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentReportId = null;
+
+        async function loadReports() {
+            const status = document.getElementById('statusFilter').value;
+            let url = 'http://127.0.0.1:8000/api/reports';
+            if (status) {
+                url += `?status=${status}`;
+            }
+
+            try {
+                const response = await fetch(url);
+                if (response.ok) {
+                    const reports = await response.json();
+                    const tbody = document.getElementById('reportsTableBody');
+                    
+                    if (reports.length === 0) {
+                        tbody.innerHTML = `<tr><td colspan="8" class="empty-state">Обращений пока нет</td></tr>`;
+                        return;
+                    }
+
+                    tbody.innerHTML = reports.map(r => `
+                        <tr>
+                            <td style="font-family: monospace; font-weight: 700; color: #0284c7;">${r.tracking_code}</td>
+                            <td>${r.applicant_type}</td>
+                            <td>${r.category_id || 'Не указана'}</td>
+                            <td><span class="badge ${r.priority === 'urgent' ? 'badge-danger' : r.priority === 'standard' ? 'badge-warning' : 'badge-info'}">${r.priority}</span></td>
+                            <td><strong>${r.status}</strong></td>
+                            <td>${r.expert_id || 'Не назначен'}</td>
+                            <td style="color: #64748b; font-size: 12px;">${new Date(r.created_at).toLocaleString()}</td>
+                            <td><button class="btn" onclick='openModal(${JSON.stringify(r)})'>Открыть</button></td>
+                        </tr>
+                    `).join('');
+                } else {
+                    document.getElementById('reportsTableBody').innerHTML = `<tr><td colspan="8" class="empty-state" style="color: #991b1b;">Ошибка загрузки данных с бэкенда</td></tr>`;
+                }
+            } catch (error) {
+                console.error(error);
+                document.getElementById('reportsTableBody').innerHTML = `<tr><td colspan="8" class="empty-state" style="color: #991b1b;">Нет связи с сервером (проверьте FastAPI)</td></tr>`;
+            }
+        }
+
+        // Функция загрузки списка экспертов в выпадающий список
+        async function loadExperts(currentExpertId) {
+            const select = document.getElementById('expertSelect');
+            try {
+                const response = await fetch('http://127.0.0.1:8000/api/experts'); // Замените путь на реальный эндпоинт экспертов, если он отличается
+                if (response.ok) {
+                    const experts = await response.json();
+                    
+                    let optionsHtml = `<option value="">-- Не назначен --</option>`;
+                    experts.forEach(exp => {
+                        // Подставьте свой ключ (например, exp.name или exp.id), в зависимости от того, как бэкенд возвращает данные
+                        const expertValue = exp.name || exp.id || exp; 
+                        const isSelected = expertValue === currentExpertId ? 'selected' : '';
+                        optionsHtml += `<option value="${expertValue}" ${isSelected}>${expertValue}</option>`;
+                    });
+                    select.innerHTML = optionsHtml;
+                } else {
+                    select.innerHTML = `<option value="">Ошибка загрузки экспертов</option>`;
+                }
+            } catch (error) {
+                console.error(error);
+                select.innerHTML = `<option value="">Нет связи с сервером</option>`;
+            }
+        }
+
+        function openModal(report) {
+            currentReportId = report.tracking_code;
+            document.getElementById('modalTracking').innerText = report.tracking_code;
+            document.getElementById('modalApplicant').innerText = report.applicant_type;
+            document.getElementById('modalCategory').innerText = report.category_id || 'Не указана';
+            document.getElementById('modalPriority').innerText = report.priority;
+            document.getElementById('modalExpert').innerText = report.expert_id || 'Не назначен';
+            document.getElementById('modalContent').innerText = report.content;
+            document.getElementById('modalStatusSelect').value = report.status;
+            
+            // Загружаем список экспертов и передаем текущего назначенного эксперта для автовыбора
+            loadExperts(report.expert_id);
+            
+            document.getElementById('reportModal').style.display = 'flex';
+        }
+
+        function closeModal() {
+            document.getElementById('reportModal').style.display = 'none';
+            currentReportId = null;
+        }
+
+        function requestAdminAccess() {
+            document.getElementById('adminPinInput').value = '';
+            document.getElementById('pinError').style.display = 'none';
+            document.getElementById('adminPinModal').style.display = 'flex';
+            document.getElementById('adminPinInput').focus();
+        }
+
+        function closeAdminModal() {
+            document.getElementById('adminPinModal').style.display = 'none';
+        }
+
+        function verifyAdminPin() {
+            const pin = document.getElementById('adminPinInput').value.trim();
+            const errorBlock = document.getElementById('pinError');
+            
+            if (pin === '3649') {
+                closeAdminModal();
+                window.location.href = 'admin.html';
+            } else {
+                errorBlock.style.display = 'block';
+                document.getElementById('adminPinInput').value = '';
+                document.getElementById('adminPinInput').focus();
+            }
+        }
+
+        async function assignExpertFromModal() {
+            const expertName = document.getElementById('expertSelect').value;
+            if (!expertName) {
+                alert('Выберите эксперта из списка');
+                return;
+            }
+
+            try {
+                const response = await fetch(`http://127.0.0.1:8000/api/reports/${currentReportId}/assign`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ expert_name: expertName })
+                });
+
+                if (response.ok) {
+                    alert('Эксперт успешно назначен');
+                    document.getElementById('modalExpert').innerText = expertName;
+                    loadReports();
+                } else {
+                    alert('Ошибка назначения эксперта');
+                }
+            } catch (error) {
+                console.error(error);
+                alert('Ошибка соединения с сервером');
+            }
+        }
+
+        async function updateReportStatus() {
+            const statusSelect = document.getElementById('modalStatusSelect');
+            if (!statusSelect) {
+                alert('Элемент выбора статуса не найден');
+                return;
+            }
+            const newStatus = statusSelect.value;
+            try {
+                const response = await fetch(`http://127.0.0.1:8000/api/reports/${currentReportId}/status`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status: newStatus })
+                });
+
+                if (response.ok) {
+                    closeModal();
+                    loadReports();
+                } else {
+                    alert('Ошибка при обновлении статуса');
+                }
+            } catch (error) {
+                console.error(error);
+                alert('Ошибка соединения с сервером');
+            }
+        }
+    </script>
+</body>
+</html>

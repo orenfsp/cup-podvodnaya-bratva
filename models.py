@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from sqlalchemy import Column, String, Text, Boolean, DateTime, ForeignKey, Enum as SQLEnum
+from sqlalchemy import Column, String, Text, Boolean, DateTime, ForeignKey, Enum as SQLEnum, Integer
 from sqlalchemy.orm import declarative_base, relationship
 import enum
 
@@ -12,15 +12,15 @@ class ApplicantType(str, enum.Enum):
     teacher = "teacher"
 
 class ReportStatus(str, enum.Enum):
-    new = "new"                           # Новое, ждёт оператора
-    distributed = "distributed"           # Распределено оператором
-    in_progress = "in_progress"           # В работе у эксперта
-    need_info = "need_info"               # Нужно уточнение от заявителя
-    ready = "ready"                       # Ответ готов
-    returned = "returned"                 # Возвращено заявителем (не помогло)
-    completed = "completed"               # Завершено (подтверждено)
-    rejected = "rejected"                 # Отклонено (спам / вне компетенции)
-    auto_closed = "auto_closed"           # Закрыто без ответа
+    new = "new"                             # Новое, ждёт оператора
+    distributed = "distributed"             # Распределено оператором
+    in_progress = "in_progress"             # В работе у эксперта
+    need_info = "need_info"                 # Нужно уточнение от заявителя
+    ready = "ready"                         # Ответ готов
+    returned = "returned"                   # Возвращено заявителем (не помогло)
+    completed = "completed"                 # Завершено (подтверждено)
+    rejected = "rejected"                   # Отклонено (спам / вне компетенции)
+    auto_closed = "auto_closed"             # Закрыто без ответа
 
 class Priority(str, enum.Enum):
     low = "low"
@@ -111,8 +111,19 @@ class AuditLog(Base):
     __tablename__ = "audit_logs"
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    admin_id = Column(String, ForeignKey("users.id"), nullable=False)
+    admin_id = Column(String, ForeignKey("users.id"), nullable=True)
     action = Column(String, nullable=False)                                 # Описание действия
     target_report_id = Column(String, nullable=True)
-    reason = Column(String, nullable=False)                                 # Причина вмешательства (требование ТЗ)
+    reason = Column(String, nullable=True)                                  # Причина вмешательства (требование ТЗ)
+    details = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+class RoutingRule(Base):
+    __tablename__ = "routing_rules"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    category_id = Column(String, ForeignKey("categories.id"), nullable=False)
+    expert_id = Column(String, ForeignKey("users.id"), nullable=False)
+    priority_threshold = Column(String, nullable=True, default="standard")
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)

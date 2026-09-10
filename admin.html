@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Панель администратора — Платформа «Отклик»</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 min-h-screen text-gray-800">
+
+    <div class="flex h-screen overflow-hidden">
+        <!-- Боковое меню -->
+        <aside class="w-64 bg-slate-800 text-white flex flex-col justify-between hidden md:flex">
+            <div>
+                <div class="p-5 text-xl font-bold tracking-wider border-b border-slate-700">
+                    🛡️ Админ-панель
+                </div>
+                <nav class="mt-5 px-4 space-y-2">
+                    <button onclick="switchTab('categories')" id="btn-categories" class="w-full text-left px-4 py-2.5 rounded-lg bg-slate-700 text-white font-medium transition">Категории</button>
+                    <button onclick="switchTab('users')" id="btn-users" class="w-full text-left px-4 py-2.5 rounded-lg hover:bg-slate-700 text-slate-300 font-medium transition">Пользователи</button>
+                    <button onclick="switchTab('routing')" id="btn-routing" class="w-full text-left px-4 py-2.5 rounded-lg hover:bg-slate-700 text-slate-300 font-medium transition">Маршрутизация</button>
+                    <button onclick="switchTab('logs')" id="btn-logs" class="w-full text-left px-4 py-2.5 rounded-lg hover:bg-slate-700 text-slate-300 font-medium transition">Аудит и логи</button>
+                </nav>
+            </div>
+            
+            <div class="p-4 border-t border-slate-700 space-y-3">
+              <a href="staff_dashboard.html" class="flex items-center gap-2 w-full px-4 py-2.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-white text-sm font-medium transition text-center justify-center">
+                Вернуться назад
+</a>
+                <div class="text-xs text-slate-400 text-center">
+                    Платформа «Отклик» v1.0
+                </div>
+            </div>
+        </aside>
+
+        <!-- Основной контент -->
+        <div class="flex-1 flex flex-col overflow-y-auto">
+            <header class="bg-white shadow-sm h-16 flex items-center px-8 justify-between">
+                <h1 id="page-title" class="text-xl font-semibold text-gray-800">Управление категориями</h1>
+                <div id="notification" class="text-sm font-medium px-3 py-1 rounded hidden"></div>
+            </header>
+
+            <main class="p-8 space-y-6">
+                
+                <!-- ВКЛАДКА: КАТЕГОРИИ -->
+                <section id="tab-categories" class="space-y-6">
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                        <h2 class="text-lg font-medium mb-4">Добавить новую категорию</h2>
+                        <form id="form-category" onsubmit="createCategory(event)" class="space-y-4 max-w-xl">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Название категории</label>
+                                <input type="text" id="cat-name" required class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Описание</label>
+                                <textarea id="cat-desc" rows="2" class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500"></textarea>
+                            </div>
+                            <button type="submit" class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 transition">Создать категорию</button>
+                        </form>
+                    </div>
+
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                        <h2 class="text-lg font-medium mb-4">Существующие категории</h2>
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-200">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">ID</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Название</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Описание</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="categories-table-body" class="bg-white divide-y divide-gray-200">
+                                    <!-- Данные подгружаются через JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ВКЛАДКА: ПОЛЬЗОВАТЕЛИ -->
+                <section id="tab-users" class="space-y-6 hidden">
+                    <div class="flex justify-between items-center bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                        <div>
+                            <h2 class="text-lg font-medium">Список пользователей системы</h2>
+                            <p class="text-sm text-gray-500">Все зарегистрированные операторы, эксперты и администраторы</p>
+                        </div>
+                        <button onclick="openUserModal()" class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 transition font-medium text-sm flex items-center gap-2">
+                            + Зарегистрировать пользователя
+                        </button>
+                    </div>
+
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-200">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">ID</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Логин</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">ФИО</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Роль</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="users-table-body" class="bg-white divide-y divide-gray-200">
+                                    <!-- Данные подгружаются через JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ВКЛАДКА: МАРШРУТИЗАЦИЯ -->
+                <section id="tab-routing" class="space-y-6 hidden">
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                        <h2 class="text-lg font-medium mb-4">Настроить правило маршрутизации</h2>
+                        <form id="form-routing" onsubmit="createRoutingRule(event)" class="space-y-4 max-w-xl">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Категория</label>
+                                <select id="route-cat" required class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none">
+                                    <!-- Подгружается через JS -->
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Эксперт</label>
+                                <select id="route-expert" required class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none">
+                                    <!-- Подгружается через JS (только эксперты) -->
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Порог приоритета</label>
+                                <select id="route-priority" class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none">
+                                    <option value="standard">Стандартный</option>
+                                    <option value="urgent">Срочный / Кризис</option>
+                                </select>
+                            </div>
+                            <button type="submit" class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 transition">Сохранить правило</button>
+                        </form>
+                    </div>
+
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                        <h2 class="text-lg font-medium mb-4">Активные правила</h2>
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-200">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Категория</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Эксперт</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Порог приоритета</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="routing-table-body" class="bg-white divide-y divide-gray-200">
+                                    <!-- Данные подгружаются через JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ВКЛАДКА: ЛОГИ АУДИТА -->
+                <section id="tab-logs" class="space-y-6 hidden">
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                        <div class="flex justify-between items-center mb-4">
+                            <h2 class="text-lg font-medium">Журнал ручных вмешательств и аудита</h2>
+                            <button onclick="loadLogs()" class="bg-gray-200 text-gray-700 px-3 py-1.5 rounded-md text-sm hover:bg-gray-300 transition">Обновить</button>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-200 text-sm">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-4 py-3 text-left font-medium text-gray-500">Дата / Время</th>
+                                        <th class="px-4 py-3 text-left font-medium text-gray-500">Действие</th>
+                                        <th class="px-4 py-3 text-left font-medium text-gray-500">Трек-номер / Цель</th>
+                                        <th class="px-4 py-3 text-left font-medium text-gray-500">Причина</th>
+                                        <th class="px-4 py-3 text-left font-medium text-gray-500">Детали</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="logs-table-body" class="bg-white divide-y divide-gray-200">
+                                    <!-- Данные подгружаются через JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+            </main>
+        </div>
+    </div>
+
+    <!-- МОДАЛЬНОЕ ОКНО СОЗДАНИЯ ПОЛЬЗОВАТЕЛЯ -->
+    <div id="user-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50">
+        <div class="bg-white rounded-xl shadow-lg p-6 max-w-md w-full mx-4">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-medium text-gray-900">Регистрация пользователя</h3>
+                <button onclick="closeUserModal()" class="text-gray-400 hover:text-gray-600 text-xl font-bold">&times;</button>
+            </div>
+            <form id="form-user" onsubmit="createUser(event)" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Логин (username)</label>
+                    <input type="text" id="user-login" required class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Пароль</label>
+                    <input type="password" id="user-pass" required class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">ФИО</label>
+                    <input type="text" id="user-fullname" class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Роль</label>
+                    <select id="user-role" class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none">
+                        <option value="operator">Оператор</option>
+                        <option value="expert">Эксперт</option>
+                        <option value="admin">Администратор</option>
+                    </select>
+                </div>
+                <div class="flex justify-end gap-3 mt-6">
+                    <button type="button" onclick="closeUserModal()" class="bg-gray-100 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-200 transition text-sm font-medium">Отмена</button>
+                    <button type="submit" class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 transition text-sm font-medium">Зарегистрировать</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = "http://localhost:8000";
+
+        function showNotification(message, isError = false) {
+            const notif = document.getElementById("notification");
+            notif.textContent = message;
+            notif.className = `text-sm font-medium px-3 py-1 rounded ${isError ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'} block`;
+            setTimeout(() => { notif.classList.add('hidden'); }, 4000);
+        }
+
+        function switchTab(tabName) {
+            ['categories', 'users', 'routing', 'logs'].forEach(t => {
+                document.getElementById(`tab-${t}`).classList.add('hidden');
+                document.getElementById(`btn-${t}`).classList.remove('bg-slate-700', 'text-white');
+                document.getElementById(`btn-${t}`).classList.add('hover:bg-slate-700', 'text-slate-300');
+            });
+
+            document.getElementById(`tab-${tabName}`).classList.remove('hidden');
+            const activeBtn = document.getElementById(`btn-${tabName}`);
+            activeBtn.classList.add('bg-slate-700', 'text-white');
+            activeBtn.classList.remove('text-slate-300', 'hover:bg-slate-700');
+
+            const titles = {
+                categories: 'Управление категориями',
+                users: 'Управление пользователями',
+                routing: 'Правила маршрутизации',
+                logs: 'Журнал аудита и логи'
+            };
+            document.getElementById('page-title').textContent = titles[tabName];
+
+            if (tabName === 'categories') loadCategories();
+            if (tabName === 'users') loadUsers();
+            if (tabName === 'routing') loadRoutingData();
+            if (tabName === 'logs') loadLogs();
+        }
+
+        // Модальное окно пользователя
+        function openUserModal() {
+            document.getElementById('user-modal').classList.remove('hidden');
+        }
+        function closeUserModal() {
+            document.getElementById('user-modal').classList.add('hidden');
+            document.getElementById('form-user').reset();
+        }
+
+        async function loadCategories() {
+            try {
+                const res = await fetch(`${API_BASE}/api/admin/categories`);
+                const data = await res.json();
+                const tbody = document.getElementById('categories-table-body');
+                tbody.innerHTML = data.map(c => `
+                    <tr>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${c.id}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${c.name}</td>
+                        <td class="px-6 py-4 text-sm text-gray-500">${c.description || '—'}</td>
+                    </tr>
+                `).join('');
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        async function createCategory(e) {
+            e.preventDefault();
+            const name = document.getElementById('cat-name').value;
+            const description = document.getElementById('cat-desc').value;
+
+            try {
+                const res = await fetch(`${API_BASE}/api/admin/categories`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, description })
+                });
+                if (res.ok) {
+                    showNotification('Категория успешно создана');
+                    document.getElementById('form-category').reset();
+                    loadCategories();
+                } else {
+                    const err = await res.json();
+                    showNotification(err.detail || 'Ошибка создания', true);
+                }
+            } catch (err) {
+                showNotification('Ошибка соединения с сервером', true);
+            }
+        }
+
+        async function loadUsers() {
+            try {
+                const res = await fetch(`${API_BASE}/api/admin/users`);
+                const data = await res.json();
+                const tbody = document.getElementById('users-table-body');
+                tbody.innerHTML = data.map(u => `
+                    <tr>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${u.id}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${u.username}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">${u.full_name || '—'}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm">
+                            <span class="px-2.5 py-1 text-xs font-semibold rounded-full ${u.role === 'admin' ? 'bg-purple-100 text-purple-800' : u.role === 'expert' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'}">
+                                ${u.role}
+                            </span>
+                        </td>
+                    </tr>
+                `).join('');
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        async function createUser(e) {
+            e.preventDefault();
+            const payload = {
+                username: document.getElementById('user-login').value,
+                password: document.getElementById('user-pass').value,
+                full_name: document.getElementById('user-fullname').value,
+                role: document.getElementById('user-role').value
+            };
+
+            try {
+                const res = await fetch(`${API_BASE}/api/admin/users`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                if (res.ok) {
+                    showNotification('Пользователь успешно создан');
+                    closeUserModal();
+                    loadUsers();
+                } else {
+                    const err = await res.json();
+                    showNotification(err.detail || 'Ошибка создания пользователя', true);
+                }
+            } catch (err) {
+                showNotification('Ошибка соединения с сервером', true);
+            }
+        }
+
+        async function loadRoutingData() {
+            try {
+                const catRes = await fetch(`${API_BASE}/api/admin/categories`);
+                const categories = await catRes.json();
+                const catSelect = document.getElementById('route-cat');
+                catSelect.innerHTML = categories.map(c => `<option value="${c.id}">${c.name} (ID: ${c.id})</option>`).join('');
+
+                const userRes = await fetch(`${API_BASE}/api/admin/users`);
+                const users = await userRes.json();
+                const experts = users.filter(u => u.role === 'expert');
+                const expertSelect = document.getElementById('route-expert');
+                
+                if (experts.length === 0) {
+                    expertSelect.innerHTML = `<option value="">Сначала создайте пользователя с ролью «Эксперт»</option>`;
+                } else {
+                    expertSelect.innerHTML = experts.map(u => `<option value="${u.id}">${u.full_name || u.username} (ID: ${u.id})</option>`).join('');
+                }
+
+                const ruleRes = await fetch(`${API_BASE}/api/admin/routing-rules`);
+                const rules = await ruleRes.json();
+                const tbody = document.getElementById('routing-table-body');
+                
+                tbody.innerHTML = rules.map(r => {
+                    const cat = categories.find(c => c.id == r.category_id);
+                    const exp = users.find(u => u.id == r.expert_id);
+                    return `
+                        <tr>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${cat ? cat.name : r.category_id}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${exp ? (exp.full_name || exp.username) : r.expert_id}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${r.priority_threshold}</td>
+                        </tr>
+                    `;
+                }).join('');
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        async function createRoutingRule(e) {
+            e.preventDefault();
+            const payload = {
+                category_id: document.getElementById('route-cat').value,
+                expert_id: document.getElementById('route-expert').value,
+                priority_threshold: document.getElementById('route-priority').value
+            };
+
+            try {
+                const res = await fetch(`${API_BASE}/api/admin/routing-rules`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                if (res.ok) {
+                    showNotification('Правило маршрутизации сохранено');
+                    loadRoutingData();
+                } else {
+                    const err = await res.json();
+                    showNotification(err.detail || 'Ошибка сохранения', true);
+                }
+            } catch (err) {
+                showNotification('Ошибка соединения с сервером', true);
+            }
+        }
+
+        async function loadLogs() {
+            try {
+                const res = await fetch(`${API_BASE}/api/admin/logs`);
+                const data = await res.json();
+                const tbody = document.getElementById('logs-table-body');
+                tbody.innerHTML = data.map(l => `
+                    <tr>
+                        <td class="px-4 py-3 whitespace-nowrap text-gray-500">${new Date(l.created_at).toLocaleString()}</td>
+                        <td class="px-4 py-3 whitespace-nowrap font-medium text-indigo-600">${l.action}</td>
+                        <td class="px-4 py-3 whitespace-nowrap text-gray-900">${l.target_report_id || '—'}</td>
+                        <td class="px-4 py-3 text-gray-700">${l.reason || '—'}</td>
+                        <td class="px-4 py-3 text-gray-500">${l.details || '—'}</td>
+                    </tr>
+                `).join('');
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        loadCategories();
+    </script>
+</body>
+</html>

@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Платформа «Отклик» — Кабинет эксперта</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+        body { background-color: #f8f9fa; color: #1e293b; min-height: 100vh; display: flex; flex-direction: column; }
+        header { background: #ffffff; border-bottom: 1px solid #e2e8f0; position: sticky; top: 0; z-index: 40; }
+        .container { max-width: 1400px; margin: 0 auto; padding: 0 20px; width: 100%; }
+        .header-content { height: 70px; display: flex; align-items: center; justify-content: space-between; }
+        .logo-box { display: flex; align-items: center; gap: 12px; }
+        .logo-icon { width: 40px; height: 40px; background: #0284c7; color: white; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 18px; }
+        .logo-text { font-size: 20px; font-weight: 800; color: #0f172a; }
+        
+        main { flex: 1; padding: 30px 20px; max-width: 1400px; margin: 0 auto; width: 100%; display: grid; grid-template-columns: 400px 1fr; gap: 24px; height: calc(100vh - 70px); }
+        
+        .sidebar-panel { background: white; border: 1px solid #e2e8f0; border-radius: 20px; display: flex; flex-direction: column; overflow: hidden; height: 100%; }
+        .sidebar-header { padding: 20px; border-bottom: 1px solid #e2e8f0; font-weight: 800; font-size: 18px; display: flex; justify-content: space-between; align-items: center; }
+        .reports-list { overflow-y: auto; flex: 1; }
+        .report-item { padding: 16px 20px; border-bottom: 1px solid #f1f5f9; cursor: pointer; transition: background 0.2s; display: flex; flex-direction: column; gap: 6px; }
+        .report-item:hover { background: #f8f9fa; }
+        .report-item.active { background: #f0f9ff; border-left: 4px solid #0284c7; }
+        .report-item-top { display: flex; justify-content: space-between; font-size: 13px; color: #64748b; }
+        .report-code { font-family: monospace; font-weight: 700; color: #0284c7; }
+        .report-preview { font-size: 14px; color: #1e293b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+        .workspace { background: white; border: 1px solid #e2e8f0; border-radius: 20px; display: flex; flex-direction: column; overflow: hidden; height: 100%; }
+        .workspace-empty { display: flex; align-items: center; justify-content: center; height: 100%; color: #64748b; font-size: 15px; text-align: center; padding: 20px; }
+        
+        .workspace-content { display: none; flex-direction: column; height: 100%; }
+        .workspace-header { padding: 20px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; background: #fff; }
+        
+        .workspace-body { display: grid; grid-template-columns: 1fr 320px; flex: 1; overflow: hidden; }
+        
+        .chat-section { display: flex; flex-direction: column; border-right: 1px solid #e2e8f0; height: 100%; background: #fafafa; }
+        .chat-messages { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
+        .message { max-width: 75%; padding: 12px 16px; border-radius: 14px; font-size: 14px; line-height: 1.4; }
+        .message.applicant { background: white; border: 1px solid #e2e8f0; align-self: flex-start; color: #1e293b; }
+        .message.expert { background: #0284c7; color: white; align-self: flex-end; }
+        .chat-input-box { padding: 16px; background: white; border-top: 1px solid #e2e8f0; display: flex; gap: 10px; }
+        
+        .meta-section { padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 20px; background: #fff; }
+        .meta-group { display: flex; flex-direction: column; gap: 8px; }
+        .meta-label { font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; }
+        
+        textarea, select, input { background: #fff; border: 1px solid #cbd5e1; border-radius: 10px; padding: 10px; font-size: 14px; outline: none; width: 100%; }
+        textarea { resize: vertical; min-height: 80px; }
+        
+        .btn { background: #0284c7; color: white; border: none; padding: 10px 16px; border-radius: 10px; font-weight: 600; font-size: 13px; cursor: pointer; transition: background 0.2s; text-align: center; }
+        .btn:hover { background: #0369a1; }
+        .btn-secondary { background: #f1f5f9; color: #475569; }
+        .btn-secondary:hover { background: #e2e8f0; }
+
+        .badge { display: inline-block; padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; text-transform: uppercase; }
+        .badge-danger { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
+        .badge-warning { background: #fffbeb; color: #92400e; border: 1px solid #fde68a; }
+        .badge-info { background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; }
+    </style>
+</head>
+<body onload="initExpertCabinet()">
+
+    <header>
+        <div class="container header-content">
+            <div class="logo-box">
+                <div class="logo-icon">💼</div>
+                <div class="logo-text">Кабинет эксперта</div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 16px;">
+                <span style="font-weight: 600; font-size: 14px; color: #475569;">Эксперт: <input type="text" id="currentExpertInput" value="Анна Смирнова" style="width: 150px; display: inline-block; padding: 6px; font-size: 13px;" onchange="initExpertCabinet()"></span>
+                <a href="index.html" class="btn btn-secondary">На главную</a>
+            </div>
+        </div>
+    </header>
+
+    <main>
+        <div class="sidebar-panel">
+            <div class="sidebar-header">
+                <span>Мои обращения</span>
+                <button class="btn btn-secondary" style="padding: 6px 10px; font-size: 12px;" onclick="initExpertCabinet()">🔄 Обновить</button>
+            </div>
+            <div class="reports-list" id="expertReportsList">
+                <div style="padding: 30px; text-align: center; color: #64748b; font-size: 14px;">Загрузка...</div>
+            </div>
+        </div>
+
+        <div class="workspace">
+            <div id="workspaceEmpty" class="workspace-empty">
+                Выберите обращение из списка слева, чтобы начать работу, просмотреть детали и ответить заявителю.
+            </div>
+
+            <div id="workspaceContent" class="workspace-content">
+                <div class="workspace-header">
+                    <div>
+                        <h2 id="activeTrackingCode" style="font-size: 18px; font-weight: 800; color: #0f172a; font-family: monospace;"></h2>
+                        <div id="activeApplicantType" style="font-size: 13px; color: #64748b;"></div>
+                    </div>
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <span id="activePriorityBadge" class="badge"></span>
+                    </div>
+                </div>
+
+                <div class="workspace-body">
+                    <div class="chat-section">
+                        <div class="chat-messages" id="chatMessagesBox"></div>
+                        <div class="chat-input-box">
+                            <input type="text" id="chatMessageInput" placeholder="Введите ответ заявителю..." onkeydown="if(event.key==='Enter') sendExpertMessage()">
+                            <button class="btn" onclick="sendExpertMessage()">Отправить</button>
+                        </div>
+                    </div>
+
+                    <div class="meta-section">
+                        <div class="meta-group">
+                            <span class="meta-label">Статус обращения</span>
+                            <select id="expertStatusSelect" onchange="updateReportStatus()">
+                                <option value="new">Новое</option>
+                                <option value="in_progress">В работе</option>
+                                <option value="needs_info">Нужно уточнение</option>
+                                <option value="ready">Ответ готов</option>
+                                <option value="completed">Завершено</option>
+                            </select>
+                        </div>
+
+                        <div class="meta-group">
+                            <span class="meta-label">Текст обращения</span>
+                            <div id="activeReportContent" style="background: #f8f9fa; border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px; font-size: 13px; color: #1e293b; line-height: 1.4; max-height: 150px; overflow-y: auto; white-space: pre-wrap; word-break: break-word;"></div>
+                        </div>
+
+                        <div class="meta-group" style="flex: 1; display: flex; flex-direction: column;">
+                            <span class="meta-label">Внутренние заметки</span>
+                            <textarea id="expertNotesInput" placeholder="Запишите сюда важные детали..." style="flex: 1; min-height: 120px;"></textarea>
+                            <button class="btn btn-secondary" style="margin-top: 8px;" onclick="saveExpertNotes()">Сохранить заметки</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        let allReports = [];
+        let currentSelectedReport = null;
+
+        function initExpertCabinet() {
+            let reports = JSON.parse(localStorage.getItem('otklik_reports') || '[]');
+            
+            if (reports.length === 0) {
+                reports = [
+                    {
+                        tracking_code: 'ОТК-4829-1920',
+                        applicant_type: 'Школьник',
+                        category: 'Конфликт с одноклассниками',
+                        content: 'Меня постоянно дразнят в классе и портят вещи.',
+                        priority: 'urgent',
+                        status: 'in_progress',
+                        expert_id: 'Анна Смирнова',
+                        notes: '',
+                        messages: [
+                            { sender_type: 'applicant', message: 'Меня постоянно дразнят в классе и портят вещи.' }
+                        ]
+                    }
+                ];
+                localStorage.setItem('otklik_reports', JSON.stringify(reports));
+            }
+
+            allReports = reports;
+            renderReportsList();
+
+            if (currentSelectedReport) {
+                const updated = allReports.find(r => r.tracking_code === currentSelectedReport.tracking_code);
+                if (updated) selectReport(updated);
+            }
+        }
+
+        function renderReportsList() {
+            const listContainer = document.getElementById('expertReportsList');
+            if (allReports.length === 0) {
+                listContainer.innerHTML = `<div style="padding: 30px; text-align: center; color: #64748b; font-size: 14px;">Нет обращений</div>`;
+                return;
+            }
+
+            listContainer.innerHTML = allReports.map(r => `
+                <div class="report-item ${currentSelectedReport && currentSelectedReport.tracking_code === r.tracking_code ? 'active' : ''}" onclick='selectReport(${JSON.stringify(r)})'>
+                    <div class="report-item-top">
+                        <span class="report-code">${r.tracking_code}</span>
+                        <span>${r.status || 'new'}</span>
+                    </div>
+                    <div class="report-preview">${r.content || 'Без текста'}</div>
+                </div>
+            `).join('');
+        }
+
+        function selectReport(report) {
+            currentSelectedReport = report;
+            renderReportsList();
+
+            document.getElementById('workspaceEmpty').style.display = 'none';
+            document.getElementById('workspaceContent').style.display = 'flex';
+
+            document.getElementById('activeTrackingCode').innerText = report.tracking_code;
+            document.getElementById('activeApplicantType').innerText = `Заявитель: ${report.applicant_type || 'Не указан'}`;
+            document.getElementById('activeReportContent').innerText = report.content || '';
+            document.getElementById('expertStatusSelect').value = report.status || 'in_progress';
+            document.getElementById('expertNotesInput').value = report.notes || '';
+
+            const badge = document.getElementById('activePriorityBadge');
+            badge.className = `badge ${report.priority === 'urgent' ? 'badge-danger' : report.priority === 'standard' ? 'badge-warning' : 'badge-info'}`;
+            badge.innerText = report.priority || 'обычный';
+
+            renderChatMessages(report);
+        }
+
+        function renderChatMessages(report) {
+            const chatBox = document.getElementById('chatMessagesBox');
+            const messages = report.messages || [];
+
+            if (messages.length === 0) {
+                chatBox.innerHTML = `<div style="text-align: center; color: #64748b; font-size: 13px;">История пуста.</div>`;
+                return;
+            }
+
+            chatBox.innerHTML = messages.map(m => `
+                <div class="message ${m.sender_type === 'expert' ? 'expert' : 'applicant'}">
+                    <div style="font-size: 10px; opacity: 0.8; margin-bottom: 2px;">${m.sender_type === 'expert' ? 'Эксперт' : 'Заявитель'}</div>
+                    <div>${m.message}</div>
+                </div>
+            `).join('');
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        function sendExpertMessage() {
+            if (!currentSelectedReport) return;
+            const input = document.getElementById('chatMessageInput');
+            const text = input.value.trim();
+            if (!text) return;
+
+            if (!currentSelectedReport.messages) {
+                currentSelectedReport.messages = [];
+            }
+
+            currentSelectedReport.messages.push({
+                sender_type: 'expert',
+                message: text
+            });
+
+            saveToLocalStorage();
+            input.value = '';
+            renderChatMessages(currentSelectedReport);
+        }
+
+        function updateReportStatus() {
+            if (!currentSelectedReport) return;
+            const newStatus = document.getElementById('expertStatusSelect').value;
+            currentSelectedReport.status = newStatus;
+            saveToLocalStorage();
+            renderReportsList();
+        }
+
+        function saveExpertNotes() {
+            if (!currentSelectedReport) return;
+            const notesText = document.getElementById('expertNotesInput').value;
+            currentSelectedReport.notes = notesText;
+            saveToLocalStorage();
+            alert('Заметки сохранены');
+        }
+
+        function saveToLocalStorage() {
+            const index = allReports.findIndex(r => r.tracking_code === currentSelectedReport.tracking_code);
+            if (index !== -1) {
+                allReports[index] = currentSelectedReport;
+                localStorage.setItem('otklik_reports', JSON.stringify(allReports));
+            }
+        }
+    </script>
+</body>
+</html>
